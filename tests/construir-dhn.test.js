@@ -62,19 +62,50 @@ test('construirDhn: boletín de alerta de 2025 sin fecha no genera alerta en 202
   assert.equal(d.tsunami.length, 0);
 });
 
-test('construirDhn: boletín de alerta sin fecha del año en curso se conserva 72 h desde que se vio', () => {
-  const html = leer('tsunami-alerta-2025.html').replace('31-2025-5', '31-2026-5');
-  const d1 = construirDhn({ htmlAvisos: leer('avisos-oleaje.html'), htmlTsunami: html, ahora });
+const sinBoletines = '<div class="accordion"><div class="position-relative"><div class="accordion-title">BOLETÍN DE SISMO TSUNAMI N° 1-2026-1</div><div class="accordion-content"><div class="text-justify">Sin nada. NO GENERA TSUNAMI EN LITORAL PERUANO.</div></div></div></div>';
+const sinFecha2026 = () => leer('tsunami-alerta-2025.html').replace('31-2025-5', '31-2026-5');
+const dia = (d, h = 15) => new Date(`2026-10-${String(d).padStart(2, '0')}T${h}:00:00Z`);
+const correr = (htmlTsunami, previo, ahoraD) =>
+  construirDhn({ htmlAvisos: leer('avisos-oleaje.html'), htmlTsunami, previo, ahora: ahoraD });
+
+test('construirDhn: boletín de alerta sin fecha del año en curso vale 72 h desde que se vio', () => {
+  const html = sinFecha2026();
+  const base = correr(sinBoletines, null, dia(8));
+  const d1 = correr(html, base, dia(9));
   assert.equal(d1.tsunami.length, 1);
   assert.equal(d1.tsunami[0].generaTsunamiEnPeru, true);
   assert.equal(d1.tsunami[0].fechaLocal, null);
-  assert.equal(d1.tsunami[0].vistoEn, ahora.toISOString());
-  // 2 días después sigue; conserva el vistoEn original
-  const dos = new Date('2026-10-11T15:00:00Z');
-  const d2 = construirDhn({ htmlAvisos: leer('avisos-oleaje.html'), htmlTsunami: html, previo: d1, ahora: dos });
-  assert.equal(d2.tsunami[0].vistoEn, ahora.toISOString());
-  // 4 días después ya no
-  const cuatro = new Date('2026-10-13T16:00:00Z');
-  const d3 = construirDhn({ htmlAvisos: leer('avisos-oleaje.html'), htmlTsunami: html, previo: d1, ahora: cuatro });
-  assert.equal(d3.tsunami.length, 0);
+  assert.equal(d1.tsunami[0].vistoEn, dia(9).toISOString());
+  const d2 = correr(html, d1, dia(11));
+  assert.equal(d2.tsunami[0].vistoEn, dia(9).toISOString(), 'conserva el vistoEn original');
+  assert.equal(correr(html, d2, dia(13, 16)).tsunami.length, 0, 'a los 4 días ya no');
+});
+
+test('construirDhn: un boletín viejo sin fecha NO reaparece como alerta en corridas posteriores', () => {
+  const html = sinFecha2026();
+  let previo = correr(sinBoletines, null, dia(8));
+  const visibles = [];
+  for (let d = 9; d <= 25; d++) {
+    previo = correr(html, previo, dia(d));
+    visibles.push(previo.tsunami.length);
+  }
+  // visible los días 9 a 12 (la ventana de 72 h es inclusiva) y nunca más
+  assert.deepEqual(visibles, [1, 1, 1, 1, ...Array(13).fill(0)]);
+});
+
+test('construirDhn: en la primera corrida (sin previo) un boletín sin fecha no cuenta como reciente', () => {
+  assert.equal(correr(sinFecha2026(), null, dia(9)).tsunami.length, 0);
+});
+
+test('construirDhn: la página de sismo/tsunami sin ningún boletín hace fallar el job (canal de seguridad mudo)', () => {
+  assert.throws(() => correr('<html><body>Sitio en mantenimiento</body></html>', null, dia(9)), /ningún boletín/);
+});
+
+test('construirDhn: un tramo con límite que no conocemos se trata como aviso no entendido', () => {
+  const previo = correr(sinBoletines, null, dia(8));
+  const htmlAvisos = leer('avisos-oleaje.html').replace('Al sur de Callao hasta San Juan de Marcona:', 'Al sur de Callao hasta Atlantis:');
+  const d = construirDhn({ htmlAvisos, htmlTsunami: sinBoletines, previo, ahora: dia(9) });
+  assert.equal(d.parseError, true);
+  assert.match(d.avisoCrudo.motivo, /atlantis/i);
+  assert.equal(d.aviso, previo.aviso, 'conserva el último aviso entendido');
 });

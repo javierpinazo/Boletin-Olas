@@ -87,3 +87,30 @@ test('línea de tiempo desordenada se rechaza', () => {
     AvisoNoEntendido,
   );
 });
+
+const TITULO_40 = 'AVISO ESPECIAL DE OLEAJE NRO. 40-26 (Válido del 07 al 10 de octubre del 2026)';
+const aviso40 = (lineas) => ({
+  titulo: TITULO_40,
+  texto: `El estado del mar presentará las siguientes condiciones:\n${lineas}\nCallao, 07 de octubre 2026`,
+});
+
+test('viñetas distintas de "?" (▪, glifo privado de Wingdings) siguen siendo tramos', () => {
+  for (const vineta of ['▪', '\uF0A7', '•', '-']) {
+    const a = parseAviso(aviso40(`b) Litoral Centro (Zona al sur de Salaverry hasta San Juan de Marcona):\n${vineta} Al sur de Callao hasta San Juan de Marcona: Oleaje fuerte del suroeste desde la tarde del jueves 08 de octubre.`));
+    assert.equal(a.tramos.length, 1, `viñeta ${JSON.stringify(vineta)}`);
+    assert.deepEqual([a.tramos[0].desde, a.tramos[0].hasta], ['callao', 'san juan de marcona']);
+    assert.equal(a.tramos[0].linea[0].nivel, 'fuerte');
+  }
+});
+
+test('una línea de tramo con niveles que no se puede leer rechaza el aviso (no se descarta en silencio)', () => {
+  assert.throws(
+    () => parseAviso(aviso40('a) Litoral Norte (Zona de Tumbes hasta Salaverry): Oleaje ligero desde el 07\nd) Al sur de Callao hasta Pisco - oleaje fuerte desde la tarde del jueves 08')),
+    AvisoNoEntendido,
+  );
+});
+
+test('la nota de clasificación ("hasta en un 50 %") no se confunde con un tramo', () => {
+  const a = parseAviso(aviso40('a) Litoral Norte (Zona de Tumbes hasta Salaverry): Oleaje ligero desde el 07\nNota: clasificación\na. Oleaje Ligero: El mar presenta alturas de olas hasta en un 50 % más sobre sus características normales.'));
+  assert.equal(a.tramos.length, 1);
+});

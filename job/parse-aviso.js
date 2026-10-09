@@ -81,6 +81,12 @@ function leerLimites(etiqueta) {
   return { desde: m[2].trim(), hasta: m[3].trim(), desdeExclusivo: m[1] === 'al sur de ' };
 }
 
+// Viñeta: "a)" o cualquier símbolo (el portal entrega "?" por un problema de codificación; si lo
+// corrigen puede aparecer "▪", "•" o un glifo privado de Wingdings).
+const RE_TRAMO = /^\s*(?:[a-z]\)|[^\p{L}\p{N}\s])\s*(.+?):\s*(.*)$/iu;
+const PARECE_TRAMO = /(al sur de|zona de|litoral)\b.*\bhasta\b/;
+const MENCIONA_NIVEL = /\b(ligero|moderado|fuerte)\b/;
+
 export function parseAviso({ titulo, texto, id = null }) {
   const numero = (titulo.match(/NRO\.\s*(\d+-\d+)/i) || [])[1];
   if (!numero) throw new AvisoNoEntendido(`Sin número de aviso en "${titulo}"`);
@@ -89,8 +95,16 @@ export function parseAviso({ titulo, texto, id = null }) {
 
   const tramos = [];
   for (const linea of texto.split('\n')) {
-    const m = linea.match(/^\s*(?:[a-c]\)|[?•·*-])\s*(.+?):\s*(.*)$/i);
-    if (!m) continue;
+    const m = linea.match(RE_TRAMO);
+    if (!m) {
+      const t = sinTildes(linea);
+      if (PARECE_TRAMO.test(t) && MENCIONA_NIVEL.test(t)) {
+        // Un tramo con niveles que no sabemos leer jamás se descarta en silencio: la playa podría
+        // quedar con el nivel de un tramo más ancho (verde sin respaldo).
+        throw new AvisoNoEntendido(`Línea de tramo no reconocida: "${linea.trim()}"`);
+      }
+      continue;
+    }
     const niveles = parsearLinea(m[2], emitidoEn);
     if (!niveles) continue; // encabezado sin niveles (p. ej. "Litoral Centro (...):")
     const limites = leerLimites(m[1]);

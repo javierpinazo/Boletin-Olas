@@ -1,6 +1,7 @@
 import { separarItems } from './html.js';
 import { parseAviso, AvisoNoEntendido } from './parse-aviso.js';
 import { parseTsunami, BoletinNoEntendido } from './parse-tsunami.js';
+import { LUGARES } from '../site/js/lugares.js';
 
 const VENTANA_TSUNAMI_MS = 72 * 3600 * 1000;
 const MAX_TSUNAMI = 10;
@@ -22,6 +23,11 @@ export function construirDhn({ htmlAvisos, htmlTsunami, previo = null, ahora }) 
   let parseError = false;
   try {
     aviso = parseAviso(oleaje[0]);
+    for (const tramo of aviso.tramos) {
+      for (const limite of [tramo.desde, tramo.hasta]) {
+        if (!(limite in LUGARES)) throw new AvisoNoEntendido(`Límite de tramo desconocido: "${limite}"`);
+      }
+    }
   } catch (e) {
     if (!(e instanceof AvisoNoEntendido)) throw e;
     parseError = true;
@@ -37,11 +43,15 @@ export function construirDhn({ htmlAvisos, htmlTsunami, previo = null, ahora }) 
   }
 
   // Algunos boletines (p. ej. los de alerta) no traen "El día ... hora local": sin fechaLocal,
-  // la vigencia se mide desde que el job los vio por primera vez (vistoEn).
-  const vistos = new Map((previo?.tsunami ?? []).map((b) => [b.numero, b.vistoEn]));
+  // la vigencia se mide desde que el job los vio por primera vez. Ese registro (`vistos`) se
+  // arrastra entre corridas sin podarse: si se perdiera al salir de la ventana, el boletín, que
+  // sigue listado en el portal meses después, volvería a parecer nuevo. En la primera corrida
+  // (sin previo) no se sabe cuándo apareció, así que queda con vistoEn null y no cuenta como reciente.
+  const vistos = { ...(previo?.vistos ?? {}) };
   const anioActual = new Date(ahora.getTime() - 5 * 3600 * 1000).getUTCFullYear();
-  const tsunami = separarItems(htmlTsunami)
-    .filter((i) => /SISMO TSUNAMI/i.test(i.titulo))
+  const boletines = separarItems(htmlTsunami).filter((i) => /SISMO TSUNAMI/i.test(i.titulo));
+  if (boletines.length === 0) throw new Error('La página de sismo/tsunami no trae ningún boletín');
+  const tsunami = boletines
     .map((i) => {
       let b;
       try {
@@ -54,16 +64,19 @@ export function construirDhn({ htmlAvisos, htmlTsunami, previo = null, ahora }) 
           magnitud: null, generaTsunamiEnPeru: true, textoCrudo: i.texto,
         };
       }
-      return { ...b, vistoEn: vistos.get(b.numero) ?? ahora.toISOString() };
+      if (!(b.numero in vistos)) vistos[b.numero] = previo ? ahora.toISOString() : null;
+      return { ...b, vistoEn: vistos[b.numero] };
     })
     .filter((b) => {
       const anioEvento = Number(b.evento?.split('-')[1]);
       if (!b.fechaLocal && anioEvento && anioEvento !== anioActual) return false; // sin fecha y de otro año
-      return ahora.getTime() - Date.parse(b.fechaLocal ?? b.vistoEn) <= VENTANA_TSUNAMI_MS;
+      const referencia = b.fechaLocal ?? b.vistoEn;
+      if (!referencia) return false;
+      return ahora.getTime() - Date.parse(referencia) <= VENTANA_TSUNAMI_MS;
     })
     .slice(0, MAX_TSUNAMI);
 
-  const dhn = { generadoEn: ahora.toISOString(), parseError, aviso, avisoCrudo, tsunami };
+  const dhn = { generadoEn: ahora.toISOString(), parseError, aviso, avisoCrudo, tsunami, vistos };
   validarDhn(dhn);
   return dhn;
 }
@@ -90,4 +103,5 @@ export function validarDhn(d) {
     falla('sin aviso y sin parseError');
   }
   if (!Array.isArray(d.tsunami)) falla('tsunami');
+  if (!d.vistos || typeof d.vistos !== 'object') falla('vistos');
 }
