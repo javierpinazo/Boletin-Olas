@@ -150,7 +150,8 @@ muestra, por playa, el mejor bloque de 2 h o más seguidas y el motivo en una l�
 ```
 
 Campos añadidos al implementar: `avisoCrudo` ({titulo, texto, url, motivo}, cuando `parseError` es true),
-`evento` y `version` de cada boletín, y `vistoEn` (ISO) para medir la vigencia de boletines sin fecha.
+`evento` y `version` de cada boletín, `vistoEn` (ISO) y el registro `vistos` {numero: ISO|null} que no se poda
+(si se podara, un boletín sin fecha que sigue listado en el portal volvería a parecer nuevo).
 El plan define el contrato definitivo y el job lo valida antes de escribirlo.
 Mapeo de momentos relativos a horas: madrugada 00:00, mañana 06:00, tarde 12:00, noche 18:00;
 el plan fija los valores definitivos y los cubre con pruebas.
