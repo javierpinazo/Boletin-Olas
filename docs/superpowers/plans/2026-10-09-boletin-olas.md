@@ -66,7 +66,7 @@ Entradas o fallos que el spec insinúa y que más probablemente afectan a quien 
 
 **Archivos:**
 - Crear: `package.json`, `.gitignore`, `job/tiempo.js`, `job/html.js`, `tests/html.test.js`
-- Ya existen (se commitean aquí): `tests/fixtures/avisos-oleaje.html` (avisos reales 39-26 y 38-26), `tests/fixtures/tsunami.html` (boletines reales 28-2026-2 y 28-2026-1), `tests/fixtures/tsunami-alerta-2025.html` (boletín real 31-2025-5), `tests/fixtures/aviso-redaccion-nueva.html` (sintético: aviso 40-26 con redacción que el parser no entiende), `tests/fixtures/tsunami-alerta.html` (sintético: boletín 29-2026-1 con conclusión de alerta)
+- Ya existen y están commiteados: `tests/fixtures/avisos-oleaje.html` (avisos reales 39-26 y 38-26), `tests/fixtures/tsunami.html` (boletines reales 28-2026-2 y 28-2026-1), `tests/fixtures/tsunami-alerta-2025.html` (boletín real 31-2025-5), `tests/fixtures/aviso-redaccion-nueva.html` (sintético: aviso 40-26 con redacción que el parser no entiende), `tests/fixtures/tsunami-alerta.html` (sintético: boletín 29-2026-1 con conclusión de alerta)
 
 **Interfaces:**
 - Produce: `htmlATexto(html: string): string`; `separarItems(html: string): Array<{id: string|null, titulo: string, texto: string}>`; de `tiempo.js`: `MESES`, `DIAS_SEMANA`, `quitarTildes(s)`, `fechaIso(y,m,d)`, `sumarDias(iso,n)`, `diaSemana(iso)`, `instanteLima(iso,hora)`.
@@ -76,7 +76,7 @@ Entradas o fallos que el spec insinúa y que más probablemente afectan a quien 
 ```bash
 cd "D:/Desarrollo/Boletin Olas"
 node -v          # debe ser v22 o superior
-git status -sb   # rama main, con tests/fixtures/ sin commitear
+git status -sb   # rama main; tests/fixtures/ ya está commiteado
 ls tests/fixtures
 ```
 
@@ -234,7 +234,7 @@ Esperado: `pass 2`, `fail 0`.
 
 ```bash
 git add package.json .gitignore job tests
-git commit -m "feat: base del repo, utilidades de HTML y fechas, fixtures reales del DHN"
+git commit -m "feat: base del repo y utilidades de HTML y fechas"
 ```
 
 ---
