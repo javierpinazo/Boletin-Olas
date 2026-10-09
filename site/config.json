@@ -1,0 +1,17 @@
+{
+  "umbrales": {
+    "altura": { "verde": 0.8, "amarillo": 1.3 },
+    "periodo": { "calmoHs": 0.6, "verde": 12, "amarillo": 14, "rojoHs": 0.8 },
+    "viento": { "verde": 12, "amarillo": 20 },
+    "terral": { "dirDesde": 20, "dirHasta": 160, "verde": 8, "amarillo": 15 },
+    "bloqueMinHoras": 2,
+    "horasMaxDhn": 36
+  },
+  "ventana": { "horaInicio": 6, "horaFin": 17 },
+  "playas": [
+    { "id": "san-bartolo", "nombre": "San Bartolo", "lat": -12.389, "lon": -76.779 },
+    { "id": "punta-hermosa", "nombre": "Punta Hermosa", "lat": -12.337, "lon": -76.826 },
+    { "id": "yuyos", "nombre": "Yuyos", "lat": -12.37, "lon": -76.797 },
+    { "id": "la-punta", "nombre": "La Punta", "lat": -12.071, "lon": -77.164, "latTramo": -12.05 }
+  ]
+}
