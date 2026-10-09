@@ -1,0 +1,17 @@
+{
+  "name": "boletin-olas",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "¿Es buen día para remar en mar calmo en Lima sur y Callao?",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test",
+    "dhn": "node job/run.js",
+    "build": "node scripts/build-site.mjs",
+    "serve": "node scripts/serve.mjs",
+    "valores": "node scripts/valores-hoy.mjs"
+  }
+}
