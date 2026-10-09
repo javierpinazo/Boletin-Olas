@@ -6,7 +6,7 @@ import { parseAviso } from '../job/parse-aviso.js';
 import { parseTsunami } from '../job/parse-tsunami.js';
 import {
   colorAltura, colorPeriodo, colorViento, colorDhn, tramoParaPlaya, nivelEn, estadoDhn,
-  evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami,
+  evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje,
 } from '../site/js/score.js';
 
 const FX = new URL('./fixtures/', import.meta.url);
@@ -134,10 +134,11 @@ test('playa-día: sin verde de 2 h pero con amarillo contiguo -> amarillo', () =
   assert.equal(r.bloque.hasta - r.bloque.desde, 3);
 });
 
-test('playa-día: día sin datos', () => {
+test('playa-día: sin horas en la ventana -> estado sin-horas (no es un veredicto del mar)', () => {
   const r = evaluar('yuyos', []);
-  assert.equal(r.color, 'rojo');
-  assert.equal(r.motivo, 'Sin datos para este día');
+  assert.equal(r.estado, 'sin-horas');
+  assert.equal(r.bloque, null);
+  assert.equal(r.motivo, 'No quedan horas dentro de la ventana de este día');
 });
 
 test('playa-día: el DHN moderado limita a amarillo aunque el mar esté plano', () => {
@@ -189,4 +190,68 @@ test('tsunami: sin fechaLocal vale vistoEn (24 h)', () => {
   const b = { evento: '31-2026', version: 5, fechaLocal: null, vistoEn: '2026-10-09T10:00:00Z', generaTsunamiEnPeru: true };
   assert.equal(evaluarTsunami([b], Date.parse('2026-10-09T20:00:00Z')).estado, 'alerta');
   assert.equal(evaluarTsunami([b], Date.parse('2026-10-10T20:00:00Z')).estado, 'ninguno');
+});
+
+test('playa-día: queda una sola hora -> pocas-horas, no "No apto: olas de 0,5 m"', () => {
+  const r = evaluar('yuyos', dia([[16, 0.4, 8, 3, 200]]));
+  assert.equal(r.estado, 'pocas-horas');
+  assert.equal(r.bloque, null);
+  assert.equal(r.motivo, 'Queda menos de 2 horas dentro de la ventana');
+});
+
+test('playa-día: con bloque el estado es ok', () => {
+  assert.equal(evaluar('yuyos', dia([[12, 0.5, 9, 5, 200], [13, 0.5, 9, 5, 200]])).estado, 'ok');
+});
+
+test('playa-día: sin bloque, el motivo es la causa roja y no una razón verde', () => {
+  const r = evaluar('yuyos', dia([[12, 0.5, 9, 5, 200], [13, 0.5, 9, 25, 200], [14, 0.5, 9, 5, 200]]));
+  assert.equal(r.estado, 'ok');
+  assert.match(r.motivo, /^No apto: viento de 25 km\/h/);
+});
+
+test('playa-día: aviso vencido -> tope amarillo y nota con la fecha de vencimiento', () => {
+  const horas = dia([[12, 0.4, 8, 3, 200], [13, 0.4, 8, 3, 200]]).map((h) => ({ ...h, hora: h.hora.replace('10-09', '10-13') }));
+  const r = evaluar('yuyos', horas);
+  assert.equal(r.color, 'amarillo');
+  assert.ok(r.notas.some((n) => /venció el 12\/10/.test(n)), JSON.stringify(r.notas));
+});
+
+test('resultadoSinMar: estado sin-mar', () => {
+  const r = resultadoSinMar(playa('yuyos'));
+  assert.equal(r.estado, 'sin-mar');
+  assert.equal(r.bloque, null);
+  assert.equal(r.motivo, 'No pude obtener el mar ahora');
+});
+
+test('estadoDia: todas sin mar -> sin-mar', () => {
+  assert.equal(estadoDia(config.playas.map(resultadoSinMar)).tipo, 'sin-mar');
+});
+
+test('estadoDia: ninguna playa con horas suficientes -> sin-horas aunque otra no tenga mar', () => {
+  const rs = [resultadoSinMar(playa('yuyos')), evaluar('san-bartolo', []), evaluar('la-punta', dia([[16, 0.4, 8, 3, 200]]))];
+  assert.equal(estadoDia(rs).tipo, 'sin-horas');
+});
+
+test('estadoDia: con mejor playa -> mejor; con horas pero todo rojo -> ninguna', () => {
+  const bueno = evaluar('yuyos', dia([[12, 0.5, 9, 5, 200], [13, 0.5, 9, 5, 200]]));
+  const malo = evaluar('la-punta', dia([[12, 2, 9, 5, 200], [13, 2, 9, 5, 200]]));
+  assert.equal(estadoDia([bueno, malo]).tipo, 'mejor');
+  assert.equal(estadoDia([bueno, malo]).mejor.playa.id, 'yuyos');
+  assert.equal(estadoDia([malo]).tipo, 'ninguna');
+});
+
+test('alertaOleaje: nivel fuerte o muy fuerte del DHN en alguna hora -> alerta con el nivel', () => {
+  const avisoFuerte = structuredClone(aviso39);
+  avisoFuerte.tramos.forEach((t) => { t.linea = [{ nivel: 'fuerte', desde: '2026-10-07T00:00:00-05:00' }]; });
+  const r = evaluarPlayaDia({ playa: playa('yuyos'), horasCrudas: dia([[12, 0.4, 8, 3, 200], [13, 0.4, 8, 3, 200]]), aviso: avisoFuerte, dhn: { ...dhn, aviso: avisoFuerte }, ahoraMs, config });
+  assert.deepEqual(alertaOleaje([r]), { nivel: 'fuerte' });
+  avisoFuerte.tramos.forEach((t) => { t.linea = [{ nivel: 'muy fuerte', desde: '2026-10-07T00:00:00-05:00' }]; });
+  const r2 = evaluarPlayaDia({ playa: playa('yuyos'), horasCrudas: dia([[12, 0.4, 8, 3, 200]]), aviso: avisoFuerte, dhn: { ...dhn, aviso: avisoFuerte }, ahoraMs, config });
+  assert.deepEqual(alertaOleaje([r2]), { nivel: 'muy fuerte' });
+});
+
+test('alertaOleaje: con ligero o moderado no hay alerta', () => {
+  const r = evaluar('yuyos', dia([[12, 0.4, 8, 3, 200], [13, 0.4, 8, 3, 200]]));
+  assert.equal(alertaOleaje([r]), null);
+  assert.equal(alertaOleaje([resultadoSinMar(playa('yuyos'))]), null);
 });

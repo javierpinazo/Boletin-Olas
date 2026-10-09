@@ -87,3 +87,4 @@ footer { font-size: .85rem; }
 footer p { margin: 6px 0; }
 .gris { color: var(--suave); }
 .chip.gris { background: var(--borde); color: var(--suave); }
+.mejor.sin-horas { color: var(--suave); }

@@ -1,8 +1,9 @@
 import { cargarMar, horasDelDia, ahoraLima } from './mar.js';
-import { evaluarPlayaDia, evaluarTsunami, mejorPlaya, estadoDhn } from './score.js';
+import { evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje } from './score.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
+const ETIQUETA_ESTADO = { 'sin-horas': 'Sin horas', 'pocas-horas': 'Menos de 2 h' };
 const ZONA = 'America/Lima';
 
 // Todo el texto remoto (DHN, Open-Meteo) entra con textContent: nunca como HTML.
@@ -55,7 +56,7 @@ function evaluarTodo() {
   const fecha = fechaDelDia(estado.dia);
   const resultados = config.playas.map((playa, i) => {
     const horas = estado.mar[i];
-    if (!horas) return { playa, sinMar: true, color: 'rojo', bloque: null, horas: [], notas: [], motivo: '' };
+    if (!horas) return resultadoSinMar(playa);
     return evaluarPlayaDia({
       playa,
       horasCrudas: horasDelDia(horas, fecha, config.ventana, ahoraMs),
@@ -75,6 +76,7 @@ function pintar() {
   const piezas = [
     bannerTsunami(tsun),
     bannerDhn(),
+    bannerOleaje(resultados),
     pestanas(),
     mejorOpcion(resultados),
     ...resultados.map(tarjeta),
@@ -90,6 +92,14 @@ function bannerTsunami(tsun) {
     el('strong', { text: `✖ Alerta del DHN: boletín de sismo/tsunami ${b.numero}` }),
     el('p', { text: 'Todas las playas figuran en rojo. No salgas al mar: revisa dhn.mil.pe o la app MGP Tsunamis.' }),
     el('details', {}, el('summary', { text: 'Texto del boletín' }), el('pre', { text: b.textoCrudo })));
+}
+
+function bannerOleaje(resultados) {
+  const alerta = alertaOleaje(resultados);
+  if (!alerta) return null;
+  return el('section', { class: 'banner rojo', role: 'alert' },
+    el('strong', { text: `✖ Oleaje ${alerta.nivel} según el DHN` }),
+    el('p', { text: 'Hay horas de este día con oleaje anómalo fuerte: esas horas figuran en rojo.' }));
 }
 
 function bannerDhn() {
@@ -118,25 +128,29 @@ function pestanas() {
 }
 
 function mejorOpcion(resultados) {
-  const mejor = mejorPlaya(resultados);
-  if (resultados.every((r) => !r.sinMar && r.horas.length === 0)) {
-    return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'Ya no quedan horas hoy' }), el('p', { text: 'La ventana de remo es de 6 a 17 h. Mira Mañana.' }));
+  const dia = estadoDia(resultados);
+  if (dia.tipo === 'sin-mar') {
+    return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'No pude obtener el mar ahora' }), el('p', { text: 'No hay semáforo sin datos de oleaje y viento. Reintenta en unos minutos.' }));
   }
-  if (!mejor) {
+  if (dia.tipo === 'sin-horas') {
+    return el('section', { class: 'mejor sin-horas' }, el('h2', { text: 'Ya no quedan horas suficientes hoy' }), el('p', { text: 'La ventana de remo es de 6 a 17 h y hacen falta al menos 2 horas seguidas. Mira Mañana.' }));
+  }
+  if (dia.tipo === 'ninguna') {
     return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'Ninguna playa apta' }), el('p', { text: 'Con los datos actuales no hay un bloque de 2 horas o más para remar en mar calmo.' }));
   }
+  const mejor = dia.mejor;
   return el('section', { class: `mejor ${mejor.color}` },
     el('p', { class: 'sobre', text: 'Mejor opción' }),
     el('h2', { text: `${SIMBOLO[mejor.color]} ${mejor.playa.nombre} · ${mejor.bloque.desde}–${mejor.bloque.hasta} h` }));
 }
 
 function tarjeta(r) {
-  if (r.sinMar) {
+  if (r.estado === 'sin-mar') {
     return el('article', { class: 'playa sin-datos' }, el('h3', { text: r.playa.nombre }), el('p', { text: 'No pude obtener el mar ahora. Reintenta más tarde.' }));
   }
   const resumen = el('summary', {},
     el('span', { class: 'nombre', text: r.playa.nombre }),
-    el('span', { class: `chip ${r.horas.length === 0 ? 'gris' : r.color}`, text: r.horas.length === 0 ? 'Sin horas' : `${SIMBOLO[r.color]} ${r.bloque ? `${r.bloque.desde}–${r.bloque.hasta} h` : ETIQUETA[r.color]}` }));
+    el('span', { class: `chip ${r.estado === 'ok' ? r.color : 'gris'}`, text: ETIQUETA_ESTADO[r.estado] ?? `${SIMBOLO[r.color]} ${r.bloque ? `${r.bloque.desde}–${r.bloque.hasta} h` : ETIQUETA[r.color]}` }));
   const filas = r.horas.map((h) => el('tr', { class: h.color },
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
     el('td', { text: h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m` }),

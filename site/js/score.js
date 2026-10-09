@@ -125,7 +125,7 @@ export function evaluarHora(dato, ctx) {
   }
   razones.push({ factor: 'dhn', ...dhn });
   const color = razones.reduce((c, r) => peor(c, r.color), VERDE);
-  return { hora: dato.hora, color, razones, dato };
+  return { hora: dato.hora, color, razones, dato, nivelDhn };
 }
 
 // ---------- Evaluación de una playa en un día ----------
@@ -159,21 +159,26 @@ function mejorRacha(horas, aceptable, minHoras) {
 // horasCrudas: [{hora:'2026-10-09T06:00', hs, tp, vientoKmh, dirViento}], ya filtradas a la ventana.
 export function evaluarPlayaDia({ playa, horasCrudas, aviso, dhn, ahoraMs, config, tsunamiAlerta = false }) {
   const u = config.umbrales;
-  const estado = estadoDhn(dhn, ahoraMs, u);
+  const estDhn = estadoDhn(dhn, ahoraMs, u);
   const tramo = aviso ? tramoParaPlaya(playa, aviso) : null;
   const notas = [];
-  if (estado === 'ausente') notas.push('No hay datos del DHN: el semáforo no puede pasar de amarillo.');
-  if (estado === 'obsoleto') notas.push('Los datos del DHN están desactualizados: tope amarillo.');
-  if (estado === 'errorParseo') notas.push('No pude leer el último aviso del DHN: tope amarillo, revisa el texto original.');
+  if (estDhn === 'ausente') notas.push('No hay datos del DHN: el semáforo no puede pasar de amarillo.');
+  if (estDhn === 'obsoleto') notas.push('Los datos del DHN están desactualizados: tope amarillo.');
+  if (estDhn === 'errorParseo') notas.push('No pude leer el último aviso del DHN: tope amarillo, revisa el texto original.');
   if (aviso && !tramo) notas.push('Esta playa no aparece en los tramos del aviso del DHN: tope amarillo.');
+  if (aviso && tramo && horasCrudas.some((h) => `${h.hora}:00-05:00` > `${aviso.validoHasta}T23:59:59-05:00`)) {
+    const [, mes, dia] = aviso.validoHasta.split('-');
+    notas.push(`El último aviso del DHN venció el ${dia}/${mes}: tope amarillo hasta que haya uno nuevo.`);
+  }
 
   const horas = horasCrudas.map((dato) => {
     let nivelDhn = null;
     if (aviso && tramo) nivelDhn = nivelEn(tramo, aviso, `${dato.hora}:00-05:00`);
-    return evaluarHora(dato, { umbrales: u, nivelDhn, estado: aviso && tramo ? estado : 'ausente', tsunamiAlerta });
+    return evaluarHora(dato, { umbrales: u, nivelDhn, estado: aviso && tramo ? estDhn : 'ausente', tsunamiAlerta });
   });
 
   const min = u.bloqueMinHoras;
+  const estado = horas.length === 0 ? 'sin-horas' : horas.length < min ? 'pocas-horas' : 'ok';
   const verde = mejorRacha(horas, (h) => h.color === VERDE, min);
   const apto = mejorRacha(horas, (h) => h.color !== ROJO, min);
   const rango = verde ?? apto;
@@ -200,15 +205,43 @@ export function evaluarPlayaDia({ playa, horasCrudas, aviso, dhn, ahoraMs, confi
       const r = horas[rango[0]].razones.find((x) => x.color === AMARILLO);
       if (r) motivo += `. ${r.texto}`;
     }
-  } else if (horas.length === 0) {
-    motivo = 'Sin datos para este día';
+  } else if (estado === 'sin-horas') {
+    motivo = 'No quedan horas dentro de la ventana de este día';
+  } else if (estado === 'pocas-horas') {
+    motivo = `Queda menos de ${min} horas dentro de la ventana`;
   } else {
-    const menosMala = [...horas].sort((a, b) => ORDEN[a.color] - ORDEN[b.color])[0];
-    const r = menosMala.razones.filter((x) => x.color === ROJO)[0] ?? menosMala.razones[0];
-    motivo = `No apto: ${r.texto.toLowerCase()}`;
+    const roja = horas.flatMap((h) => h.razones).find((x) => x.color === ROJO);
+    motivo = roja ? `No apto: ${roja.texto.toLowerCase()}` : `No hay ${min} horas seguidas aptas`;
   }
 
-  return { playa, horas, bloque, color, motivo, notas, tramo: tramo?.nombre ?? null };
+  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null };
+}
+
+// Playa para la que Open-Meteo no respondió: sin semáforo.
+export function resultadoSinMar(playa) {
+  return {
+    playa, horas: [], bloque: null, color: ROJO, estado: 'sin-mar',
+    motivo: 'No pude obtener el mar ahora', notas: [], tramo: null,
+  };
+}
+
+// Qué titular mostrar: sin mar en ninguna playa, ya no quedan horas suficientes, la mejor playa,
+// o "ninguna apta" (hay horas y el mar no da para remar).
+export function estadoDia(resultados) {
+  const conMar = resultados.filter((r) => r.estado !== 'sin-mar');
+  if (conMar.length === 0) return { tipo: 'sin-mar' };
+  const mejor = mejorPlaya(conMar);
+  if (mejor) return { tipo: 'mejor', mejor };
+  if (conMar.every((r) => r.estado === 'sin-horas' || r.estado === 'pocas-horas')) return { tipo: 'sin-horas' };
+  return { tipo: 'ninguna' };
+}
+
+// Alerta de oleaje del DHN (fuerte / muy fuerte) en alguna hora evaluada de alguna playa.
+export function alertaOleaje(resultados) {
+  const niveles = new Set(resultados.flatMap((r) => r.horas.map((h) => h.nivelDhn)));
+  if (niveles.has('muy fuerte')) return { nivel: 'muy fuerte' };
+  if (niveles.has('fuerte')) return { nivel: 'fuerte' };
+  return null;
 }
 
 export function mejorPlaya(resultados) {
