@@ -17,6 +17,21 @@ export function colorAltura(hs, u) {
   return { color: ROJO, texto: `Olas de ${f1(hs)} m, demasiado altas` };
 }
 
+// Escala descriptiva del mar por altura de ola. El rojo queda reservado para lo muy alto (más de
+// `altura.agitado`), el tsunami o el oleaje Alto del DHN; el naranja es el tramo intermedio.
+export const ETIQUETA_GRADO = {
+  calmo: 'Mar calmo', algo: 'Mar con algo de olas', movido: 'Mar movido', agitado: 'Mar muy agitado',
+};
+export const COLOR_GRADO = { calmo: VERDE, algo: AMARILLO, movido: 'naranja', agitado: ROJO };
+const ORDEN_GRADO = ['calmo', 'algo', 'movido', 'agitado'];
+
+export function gradoMar(hs, u) {
+  if (hs <= u.altura.verde) return 'calmo';
+  if (hs <= u.altura.amarillo) return 'algo';
+  if (hs <= u.altura.agitado) return 'movido';
+  return 'agitado';
+}
+
 export function colorPeriodo(tp, hs, u) {
   const p = u.periodo;
   if (hs <= p.calmoHs) return { color: VERDE, texto: `Periodo de ${f1(tp)} s` };
@@ -214,13 +229,25 @@ export function evaluarPlayaDia({ playa, horasCrudas, aviso, dhn, ahoraMs, confi
     motivo = roja ? `No apto: ${roja.texto.toLowerCase()}` : `No hay ${min} horas seguidas aptas`;
   }
 
-  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null };
+  const alturas = horas.map((h) => h.dato.hs).filter((v) => !sinDato(v));
+  const hsMedia = alturas.length ? alturas.reduce((a, b) => a + b, 0) / alturas.length : null;
+  const dhnAlto = horas.some((h) => h.nivelDhn === 'fuerte' || h.nivelDhn === 'muy fuerte');
+  let grado = hsMedia === null ? null : gradoMar(hsMedia, u);
+  if (horas.length > 0 && (tsunamiAlerta || dhnAlto)) grado = 'agitado';
+  let causa;
+  if (tsunamiAlerta) causa = 'Alerta de sismo/tsunami del DHN';
+  else if (dhnAlto) causa = 'Oleaje Alto según el DHN';
+  else if (hsMedia !== null && hsMedia > u.altura.verde) {
+    causa = `Olas de ${f1(hsMedia)} m según el modelo; para mar calmo conviene menos de ${f1(u.altura.verde)} m`;
+  } else causa = motivo;
+
+  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa };
 }
 
 // Playa para la que Open-Meteo no respondió: sin semáforo.
 export function resultadoSinMar(playa) {
   return {
-    playa, horas: [], bloque: null, color: ROJO, estado: 'sin-mar',
+    playa, horas: [], bloque: null, color: ROJO, estado: 'sin-mar', hsMedia: null, grado: null, causa: null,
     motivo: 'No pude obtener el mar ahora', notas: [], tramo: null,
   };
 }
@@ -233,7 +260,11 @@ export function estadoDia(resultados) {
   const mejor = mejorPlaya(conMar);
   if (mejor) return { tipo: 'mejor', mejor };
   if (conMar.every((r) => r.estado === 'sin-horas' || r.estado === 'pocas-horas')) return { tipo: 'sin-horas' };
-  return { tipo: 'ninguna' };
+  // Sin bloque apto: se describe el mar de la playa que está en mejor grado, no se "juzga".
+  const representante = conMar
+    .filter((r) => r.grado)
+    .sort((a, b) => ORDEN_GRADO.indexOf(a.grado) - ORDEN_GRADO.indexOf(b.grado) || (a.hsMedia ?? Infinity) - (b.hsMedia ?? Infinity))[0];
+  return { tipo: 'ninguna', grado: representante?.grado ?? null, causa: representante?.causa ?? null };
 }
 
 // Alerta de oleaje del DHN (fuerte / muy fuerte) en alguna hora evaluada de alguna playa.

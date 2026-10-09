@@ -10,6 +10,8 @@
   --amarillo-fondo: #fff1cc;
   --rojo: #a4262c;
   --rojo-fondo: #fde3e3;
+  --naranja: #b4540a;
+  --naranja-fondo: #ffe6cf;
   --acento: #0b5ea8;
 }
 @media (prefers-color-scheme: dark) {
@@ -25,6 +27,8 @@
     --amarillo-fondo: #3a2e0d;
     --rojo: #ff8b8b;
     --rojo-fondo: #3d1517;
+    --naranja: #ffa45c;
+    --naranja-fondo: #3d230d;
     --acento: #6db3f2;
   }
 }
@@ -62,7 +66,8 @@ pre { white-space: pre-wrap; font: .8rem/1.4 ui-monospace, Menlo, Consolas, mono
 .mejor .sobre { margin: 0 0 2px; font-size: .8rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; }
 .mejor.verde { background: var(--verde-fondo); color: var(--verde); border-color: var(--verde); }
 .mejor.amarillo { background: var(--amarillo-fondo); color: var(--amarillo); border-color: var(--amarillo); }
-.mejor.ninguna { color: var(--rojo); background: var(--rojo-fondo); border-color: var(--rojo); }
+.mejor.ninguna, .mejor.rojo { color: var(--rojo); background: var(--rojo-fondo); border-color: var(--rojo); }
+.mejor.naranja { color: var(--naranja); background: var(--naranja-fondo); border-color: var(--naranja); }
 
 .playa { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 0 16px; }
 .playa.sin-datos { padding: 12px 16px; color: var(--suave); }
@@ -74,6 +79,7 @@ pre { white-space: pre-wrap; font: .8rem/1.4 ui-monospace, Menlo, Consolas, mono
 .chip.verde { background: var(--verde-fondo); color: var(--verde); }
 .chip.amarillo { background: var(--amarillo-fondo); color: var(--amarillo); }
 .chip.rojo { background: var(--rojo-fondo); color: var(--rojo); }
+.chip.naranja { background: var(--naranja-fondo); color: var(--naranja); }
 .motivo { margin: 0 0 8px; }
 .nota { margin: 0 0 8px; font-size: .85rem; color: var(--amarillo); }
 table { width: 100%; border-collapse: collapse; font-size: .85rem; margin-bottom: 14px; }

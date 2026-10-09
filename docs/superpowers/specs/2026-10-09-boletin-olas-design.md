@@ -167,6 +167,9 @@ Móvil primero, una pantalla; HTML/CSS/JS planos; tema claro/oscuro automático;
   difieren, y el nivel en cada tarjeta de playa. Sin aviso vigente dice "Sin aviso vigente del DHN", nunca "Normal".
 - Pestañas Hoy / Mañana / Pasado (Hoy por defecto).
 - "Mejor opción" del día: playa y bloque horario.
+  Si ninguna playa tiene un bloque apto no se muestra "ninguna apta": el titular describe el mar con una escala de
+  colores por altura de ola media (calmo ≤ 0,8 m verde; con algo de olas ≤ 1,3 m amarillo; movido ≤ 2,0 m naranja;
+  muy agitado > 2,0 m, tsunami u oleaje Alto del DHN, rojo) y explica la causa. El mismo grado va en el chip de cada playa.
 - Una tarjeta por playa con su mejor bloque; al tocarla se abre la franja 06–17 h con color por hora y
   los valores (ola, periodo, viento).
 - Pie: aviso DHN vigente (número, validez, nivel), línea de sismo/tsunami, hora de la última corrida del

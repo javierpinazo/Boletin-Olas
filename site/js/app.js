@@ -1,9 +1,10 @@
 import { cargarMar, horasDelDia, ahoraLima } from './mar.js';
 import {
   evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, ETIQUETA_NIVEL,
+  ETIQUETA_GRADO, COLOR_GRADO,
 } from './score.js';
 
-const SIMBOLO = { verde: '✔', amarillo: '⚠', rojo: '✖' };
+const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
 const ETIQUETA_ESTADO = { 'sin-horas': 'Sin horas', 'pocas-horas': 'Menos de 2 h' };
 const ZONA = 'America/Lima';
@@ -161,12 +162,26 @@ function mejorOpcion(resultados) {
     return el('section', { class: 'mejor sin-horas' }, el('h2', { text: 'Ya no quedan horas suficientes hoy' }), el('p', { text: 'La ventana de remo es de 6 a 17 h y hacen falta al menos 2 horas seguidas. Mira Mañana.' }));
   }
   if (dia.tipo === 'ninguna') {
-    return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'Ninguna playa apta' }), el('p', { text: 'Con los datos actuales no hay un bloque de 2 horas o más para remar en mar calmo.' }));
+    // Sin bloque apto no se "juzga": se describe el mar con la escala de colores y se explica la causa.
+    const color = dia.grado ? COLOR_GRADO[dia.grado] : 'rojo';
+    return el('section', { class: `mejor ${color}` },
+      el('h2', { text: `${SIMBOLO[color]} ${dia.grado ? ETIQUETA_GRADO[dia.grado] : 'Sin bloque apto'}` }),
+      el('p', { text: dia.causa ?? 'No hay un bloque de 2 horas o más para remar en mar calmo.' }));
   }
   const mejor = dia.mejor;
   return el('section', { class: `mejor ${mejor.color}` },
     el('p', { class: 'sobre', text: 'Mejor opción' }),
     el('h2', { text: `${SIMBOLO[mejor.color]} ${mejor.playa.nombre} · ${mejor.bloque.desde}–${mejor.bloque.hasta} h` }));
+}
+
+// Con bloque: su horario y color. Sin bloque: el grado del mar (Mar movido, etc.) con su color.
+function chipDePlaya(r) {
+  if (r.estado !== 'ok') return el('span', { class: 'chip gris', text: ETIQUETA_ESTADO[r.estado] });
+  if (r.bloque) {
+    return el('span', { class: `chip ${r.color}`, text: `${SIMBOLO[r.color]} ${r.bloque.desde}–${r.bloque.hasta} h` });
+  }
+  const color = r.grado ? COLOR_GRADO[r.grado] : r.color;
+  return el('span', { class: `chip ${color}`, text: `${SIMBOLO[color]} ${r.grado ? ETIQUETA_GRADO[r.grado] : ETIQUETA[r.color]}` });
 }
 
 function nivelDePlaya(playa, oleaje) {
@@ -183,7 +198,7 @@ function tarjeta(r, oleaje) {
   const resumen = el('summary', {},
     el('span', { class: 'nombre', text: r.playa.nombre },
       nivelDePlaya(r.playa, oleaje)),
-    el('span', { class: `chip ${r.estado === 'ok' ? r.color : 'gris'}`, text: ETIQUETA_ESTADO[r.estado] ?? `${SIMBOLO[r.color]} ${r.bloque ? `${r.bloque.desde}–${r.bloque.hasta} h` : ETIQUETA[r.color]}` }));
+    chipDePlaya(r));
   const filas = r.horas.map((h) => el('tr', { class: h.color },
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
     el('td', { text: h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m` }),

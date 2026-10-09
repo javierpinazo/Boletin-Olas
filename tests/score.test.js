@@ -6,7 +6,7 @@ import { parseAviso } from '../job/parse-aviso.js';
 import { parseTsunami } from '../job/parse-tsunami.js';
 import {
   colorAltura, colorPeriodo, colorViento, colorDhn, tramoParaPlaya, nivelEn, estadoDhn,
-  evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia,
+  evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, gradoMar, ETIQUETA_GRADO, COLOR_GRADO,
 } from '../site/js/score.js';
 
 const FX = new URL('./fixtures/', import.meta.url);
@@ -322,4 +322,77 @@ test('oleaje DHN: sin aviso -> null; playa fuera de los tramos -> grupo sin tram
   assert.equal(r.grupos[0].tramo, null);
   assert.equal(r.grupos[0].texto, 'Esta playa no aparece en los tramos del aviso');
   assert.equal(r.grupos[0].nivelMax, null);
+});
+
+// ---------- Escala del mar: calmo / algo / movido / agitado ----------
+
+test('gradoMar: cortes 0,8 / 1,3 / 2,0 m', () => {
+  assert.equal(gradoMar(0.8, u), 'calmo');
+  assert.equal(gradoMar(0.81, u), 'algo');
+  assert.equal(gradoMar(1.3, u), 'algo');
+  assert.equal(gradoMar(1.31, u), 'movido');
+  assert.equal(gradoMar(2.0, u), 'movido');
+  assert.equal(gradoMar(2.01, u), 'agitado');
+});
+
+test('escala: etiquetas y colores (rojo reservado para lo muy alto)', () => {
+  assert.deepEqual(
+    ['calmo', 'algo', 'movido', 'agitado'].map((g) => [ETIQUETA_GRADO[g], COLOR_GRADO[g]]),
+    [['Mar calmo', 'verde'], ['Mar con algo de olas', 'amarillo'], ['Mar movido', 'naranja'], ['Mar muy agitado', 'rojo']],
+  );
+});
+
+const constante = (hs, horas = [12, 13, 14]) => dia(horas.map((h) => [h, hs, 8, 3, 200]));
+
+test('playa-día: olas de 1,5 m con DHN leve -> Mar movido (naranja), con la causa explicada', () => {
+  const r = evaluar('yuyos', constante(1.5));
+  assert.equal(r.grado, 'movido');
+  assert.equal(r.hsMedia, 1.5);
+  assert.equal(r.causa, 'Olas de 1,5 m según el modelo; para mar calmo conviene menos de 0,8 m');
+});
+
+test('playa-día: el grado usa la altura media de las horas evaluadas', () => {
+  const r = evaluar('yuyos', dia([[12, 1.4, 8, 3, 200], [13, 1.6, 8, 3, 200]]));
+  assert.equal(r.hsMedia, 1.5);
+  assert.equal(evaluar('yuyos', constante(0.5)).grado, 'calmo');
+  assert.equal(evaluar('yuyos', constante(2.5)).grado, 'agitado');
+});
+
+test('playa-día: tsunami u oleaje Alto del DHN llevan el grado a agitado (rojo) aunque el mar esté plano', () => {
+  const t = evaluar('yuyos', constante(0.4), { tsunamiAlerta: true });
+  assert.equal(t.grado, 'agitado');
+  assert.equal(t.causa, 'Alerta de sismo/tsunami del DHN');
+  const a = structuredClone(aviso39);
+  a.tramos.forEach((tr) => { tr.linea = [{ nivel: 'fuerte', desde: '2026-10-07T00:00:00-05:00' }]; });
+  const d = evaluarPlayaDia({ playa: playa('yuyos'), horasCrudas: constante(0.4), aviso: a, dhn: { ...dhn, aviso: a }, ahoraMs, config });
+  assert.equal(d.grado, 'agitado');
+  assert.equal(d.causa, 'Oleaje Alto según el DHN');
+});
+
+test('playa-día: sin horas o sin mar no tienen grado', () => {
+  assert.equal(evaluar('yuyos', []).grado, null);
+  assert.equal(resultadoSinMar(playa('yuyos')).grado, null);
+});
+
+test('playa-día: sin dato de ola no inventa grado', () => {
+  const r = evaluar('yuyos', dia([[12, null, null, 3, 200], [13, null, null, 3, 200]]));
+  assert.equal(r.grado, null);
+  assert.equal(r.hsMedia, null);
+});
+
+test('estadoDia ninguna: describe el mar con el grado y la causa de la mejor playa', () => {
+  const movido = evaluar('yuyos', constante(1.5));
+  const agitado = evaluar('la-punta', constante(2.4));
+  const e = estadoDia([agitado, movido]);
+  assert.equal(e.tipo, 'ninguna');
+  assert.equal(e.grado, 'movido');
+  assert.equal(e.causa, 'Olas de 1,5 m según el modelo; para mar calmo conviene menos de 0,8 m');
+});
+
+test('estadoDia ninguna: con olas calmas pero sin bloque la causa es el motivo (p. ej. el viento)', () => {
+  const ventoso = evaluar('yuyos', dia([[12, 0.5, 8, 25, 200], [13, 0.5, 8, 25, 200]]));
+  const e = estadoDia([ventoso]);
+  assert.equal(e.tipo, 'ninguna');
+  assert.equal(e.grado, 'calmo');
+  assert.equal(e.causa, 'No apto: viento de 25 km/h');
 });

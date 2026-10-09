@@ -1,6 +1,6 @@
 {
   "umbrales": {
-    "altura": { "verde": 0.8, "amarillo": 1.3 },
+    "altura": { "verde": 0.8, "amarillo": 1.3, "agitado": 2.0 },
     "periodo": { "calmoHs": 0.6, "verde": 12, "amarillo": 14, "rojoHs": 0.8 },
     "viento": { "verde": 12, "amarillo": 20 },
     "terral": { "dirDesde": 20, "dirHasta": 160, "verde": 8, "amarillo": 15 },
