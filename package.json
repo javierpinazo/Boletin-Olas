@@ -12,6 +12,7 @@
     "dhn": "node job/run.js",
     "build": "node scripts/build-site.mjs",
     "serve": "node scripts/serve.mjs",
-    "valores": "node scripts/valores-hoy.mjs"
+    "valores": "node scripts/valores-hoy.mjs",
+    "hoy": "node scripts/hoy.mjs"
   }
 }

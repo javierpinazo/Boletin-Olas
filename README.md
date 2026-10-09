@@ -10,6 +10,7 @@
 
 | Comando | Qué hace |
 |---|---|
+| `npm run hoy` | **Un solo paso antes de salir:** lee el DHN, arma el sitio, lo sirve y abre el navegador (Ctrl+C para cerrar) |
 | `npm test` | Pruebas (parsers sobre HTML real del DHN, scorer, Open-Meteo) |
 | `npm run dhn` | Lee el DHN y escribe `data/dhn.json` |
 | `npm run build` | Arma `_site/` (sitio + `dhn.json`) |
