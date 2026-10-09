@@ -1,6 +1,6 @@
 # Boletín Olas — Diseño
 
-Fecha: 2026-10-09 · Estado: pendiente de revisión
+Fecha: 2026-10-09 · Estado: aprobado (ajustado el 2026-10-09 tras probar contra el DHN real; ver plan)
 
 ## 1. Propósito
 
@@ -33,7 +33,7 @@ Open-Meteo (CORS abierto) ───────────► navegador (site/)
 GitHub Actions (job/): scraper + parser del DHN
   · cron diario ~05:30 hora de Lima
   · workflow_dispatch (botón "Run workflow" a demanda)
-  · escribe data/dhn.json solo si cambió
+  · reescribe y commitea data/dhn.json cada vez (así generadoEn siempre refleja la última lectura)
 GitHub Pages sirve site/ y data/
 ```
 
@@ -92,7 +92,7 @@ La página lo declara en una nota.
 
 ## 6. Criterio de "buen día" (remo en mar calmo, nivel intermedio)
 
-Se evalúa cada hora entre 06:00 y 17:00. El color de la hora es el **peor** de los factores. La página
+Se evalúa cada hora entre 06:00 y 17:00 (la última hora evaluada es la de las 16:00; un bloque puede terminar a las 17:00). El color de la hora es el **peor** de los factores. La página
 muestra, por playa, el mejor bloque de 2 h o más seguidas y el motivo en una línea.
 
 | Factor | Verde | Amarillo | Rojo |
@@ -110,9 +110,12 @@ muestra, por playa, el mejor bloque de 2 h o más seguidas y el motivo en una l�
 
 ### Override de tsunami
 
+- Por cada evento sísmico (p. ej. `28-2026`) vale solo el boletín de mayor versión (`-2` reemplaza a `-1`).
 - Boletín de sismo/tsunami de las últimas 24 h **sin** la frase "NO GENERA TSUNAMI EN LITORAL PERUANO":
   banner rojo y todas las playas en rojo.
 - Con esa frase: línea informativa gris ("Sismo 7,6 Mw Panamá: sin tsunami en el litoral peruano").
+- Algunos boletines (los de alerta, p. ej. el real `31-2025-5`) no traen "El día … hora local": sin fecha, la
+  vigencia se cuenta desde que el job lo vio por primera vez (`vistoEn`), y los de años anteriores se descartan.
 - Texto no reconocible: se trata como alerta y se muestra el texto crudo (mejor falso positivo que falso
   negativo).
 - La página muestra la hora de la última corrida del job y recomienda revisar dhn.mil.pe o la app MGP
@@ -146,7 +149,9 @@ muestra, por playa, el mejor bloque de 2 h o más seguidas y el motivo en una l�
 }
 ```
 
-Los campos exactos pueden ajustarse en el plan; el contrato se versiona y el front lo valida.
+Campos añadidos al implementar: `avisoCrudo` ({titulo, texto, url, motivo}, cuando `parseError` es true),
+`evento` y `version` de cada boletín, y `vistoEn` (ISO) para medir la vigencia de boletines sin fecha.
+El plan define el contrato definitivo y el job lo valida antes de escribirlo.
 Mapeo de momentos relativos a horas: madrugada 00:00, mañana 06:00, tarde 12:00, noche 18:00;
 el plan fija los valores definitivos y los cubre con pruebas.
 
