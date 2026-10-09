@@ -6,7 +6,7 @@ import { parseAviso } from '../job/parse-aviso.js';
 import { parseTsunami } from '../job/parse-tsunami.js';
 import {
   colorAltura, colorPeriodo, colorViento, colorDhn, tramoParaPlaya, nivelEn, estadoDhn,
-  evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje,
+  evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia,
 } from '../site/js/score.js';
 
 const FX = new URL('./fixtures/', import.meta.url);
@@ -254,4 +254,72 @@ test('alertaOleaje: con ligero o moderado no hay alerta', () => {
   const r = evaluar('yuyos', dia([[12, 0.4, 8, 3, 200], [13, 0.4, 8, 3, 200]]));
   assert.equal(alertaOleaje([r]), null);
   assert.equal(alertaOleaje([resultadoSinMar(playa('yuyos'))]), null);
+});
+
+// ---------- Oleaje anómalo del DHN (Leve / Medio / Alto) ----------
+
+const ventana = config.ventana;
+const resumen = (fecha, avisoUsado = aviso39, playas = config.playas) =>
+  resumenOleajeDia({ aviso: avisoUsado, playas, fecha, ventana });
+const grupoDe = (r, nombrePlaya) => r.grupos.find((g) => g.playas.includes(nombrePlaya));
+
+test('oleaje DHN: el 9/10 baja de Medio a Leve a las 12 h (La Punta y el sur comparten horario)', () => {
+  const r = resumen('2026-10-09');
+  assert.deepEqual(grupoDe(r, 'Yuyos').segmentos, [
+    { desde: 6, hasta: 12, nivel: 'moderado' },
+    { desde: 12, hasta: 17, nivel: 'ligero' },
+  ]);
+  assert.equal(grupoDe(r, 'Yuyos').texto, 'Medio hasta las 12 h, luego Leve');
+  assert.equal(grupoDe(r, 'Yuyos').nivelMax, 'moderado');
+  assert.equal(grupoDe(r, 'La Punta').texto, 'Medio hasta las 12 h, luego Leve');
+});
+
+test('oleaje DHN: La Punta y las otras tres van en grupos distintos (tramos distintos)', () => {
+  const r = resumen('2026-10-09');
+  assert.equal(r.grupos.length, 2);
+  assert.deepEqual(grupoDe(r, 'San Bartolo').playas, ['San Bartolo', 'Punta Hermosa', 'Yuyos']);
+  assert.deepEqual(grupoDe(r, 'La Punta').playas, ['La Punta']);
+});
+
+test('oleaje DHN: un día entero en un solo nivel', () => {
+  const g = grupoDe(resumen('2026-10-08'), 'Yuyos');
+  assert.deepEqual(g.segmentos, [{ desde: 6, hasta: 17, nivel: 'moderado' }]);
+  assert.equal(g.texto, 'Medio de 6 a 17 h');
+  const leve = grupoDe(resumen('2026-10-11'), 'Yuyos');
+  assert.equal(leve.texto, 'Leve de 6 a 17 h');
+  assert.equal(leve.nivelMax, 'ligero');
+});
+
+test('oleaje DHN: fuerte y muy fuerte son Alto; muy fuerte se aclara', () => {
+  const a = structuredClone(aviso39);
+  a.tramos.forEach((t) => { t.linea = [{ nivel: 'fuerte', desde: '2026-10-07T00:00:00-05:00' }, { nivel: 'muy fuerte', desde: '2026-10-09T10:00:00-05:00' }]; });
+  const g = grupoDe(resumen('2026-10-09', a), 'Yuyos');
+  assert.equal(g.texto, 'Alto hasta las 10 h, luego Alto (muy fuerte)');
+  assert.equal(g.nivelMax, 'muy fuerte');
+});
+
+test('oleaje DHN: tres niveles seguidos', () => {
+  const a = structuredClone(aviso39);
+  a.tramos.forEach((t) => { t.linea = [{ nivel: 'ligero', desde: '2026-10-07T00:00:00-05:00' }, { nivel: 'moderado', desde: '2026-10-09T09:00:00-05:00' }, { nivel: 'ligero', desde: '2026-10-09T14:00:00-05:00' }]; });
+  assert.equal(grupoDe(resumen('2026-10-09', a), 'Yuyos').texto, 'Leve hasta las 9 h, luego Medio hasta las 14 h, luego Leve');
+});
+
+test('oleaje DHN: antes del primer punto del aviso es Normal', () => {
+  const g = grupoDe(resumen('2026-10-06'), 'Yuyos');
+  assert.equal(g.texto, 'Normal de 6 a 17 h');
+  assert.equal(g.nivelMax, 'normal');
+});
+
+test('oleaje DHN: aviso vencido -> "Sin aviso vigente del DHN", sin inventar Normal', () => {
+  const g = grupoDe(resumen('2026-10-13'), 'Yuyos');
+  assert.equal(g.texto, 'Sin aviso vigente del DHN');
+  assert.equal(g.nivelMax, null);
+});
+
+test('oleaje DHN: sin aviso -> null; playa fuera de los tramos -> grupo sin tramo', () => {
+  assert.equal(resumen('2026-10-09', null), null);
+  const r = resumen('2026-10-09', aviso39, [{ nombre: 'Lejana', lat: -25, lon: -70 }]);
+  assert.equal(r.grupos[0].tramo, null);
+  assert.equal(r.grupos[0].texto, 'Esta playa no aparece en los tramos del aviso');
+  assert.equal(r.grupos[0].nivelMax, null);
 });

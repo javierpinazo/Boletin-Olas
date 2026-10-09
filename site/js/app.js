@@ -1,5 +1,7 @@
 import { cargarMar, horasDelDia, ahoraLima } from './mar.js';
-import { evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje } from './score.js';
+import {
+  evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, ETIQUETA_NIVEL,
+} from './score.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -67,19 +69,42 @@ function evaluarTodo() {
       tsunamiAlerta: tsun.estado === 'alerta',
     });
   });
-  return { tsun, resultados };
+  const oleaje = resumenOleajeDia({
+    aviso: dhn?.aviso ?? null, playas: config.playas, fecha, ventana: config.ventana,
+  });
+  return { tsun, resultados, oleaje };
+}
+
+// Leve / Medio / Alto del DHN con el color del semáforo (ligero verde, moderado amarillo, fuerte rojo).
+const COLOR_NIVEL = { normal: 'verde', ligero: 'verde', moderado: 'amarillo', fuerte: 'rojo', 'muy fuerte': 'rojo' };
+const colorNivel = (nivel) => COLOR_NIVEL[nivel] ?? 'gris';
+
+function bloqueOleaje(oleaje) {
+  const titulo = el('h2', { text: 'Oleaje anómalo (DHN)' });
+  if (!oleaje) {
+    return el('section', { class: 'oleaje' }, titulo, el('p', { class: 'gris', text: 'No hay aviso del DHN para este día.' }));
+  }
+  const unico = oleaje.grupos.every((g) => g.texto === oleaje.grupos[0].texto);
+  const grupos = unico ? [{ ...oleaje.grupos[0], playas: null }] : oleaje.grupos;
+  return el('section', { class: 'oleaje' }, titulo, grupos.map((g) => {
+    const color = colorNivel(g.nivelMax);
+    return el('p', {},
+      g.playas ? el('span', { class: 'gris', text: `${g.playas.join(', ')}: ` }) : null,
+      el('span', { class: `chip ${color}`, text: `${g.nivelMax ? SIMBOLO[color] + ' ' : ''}${g.texto}` }));
+  }));
 }
 
 function pintar() {
-  const { tsun, resultados } = evaluarTodo();
+  const { tsun, resultados, oleaje } = evaluarTodo();
   const raiz = document.getElementById('app');
   const piezas = [
     bannerTsunami(tsun),
     bannerDhn(),
     bannerOleaje(resultados),
     pestanas(),
+    bloqueOleaje(oleaje),
     mejorOpcion(resultados),
-    ...resultados.map(tarjeta),
+    ...resultados.map((r) => tarjeta(r, oleaje)),
     pie(tsun),
   ];
   raiz.replaceChildren(...piezas.filter(Boolean));
@@ -144,12 +169,20 @@ function mejorOpcion(resultados) {
     el('h2', { text: `${SIMBOLO[mejor.color]} ${mejor.playa.nombre} · ${mejor.bloque.desde}–${mejor.bloque.hasta} h` }));
 }
 
-function tarjeta(r) {
+function nivelDePlaya(playa, oleaje) {
+  const grupo = oleaje?.grupos.find((g) => g.playas.includes(playa.nombre));
+  if (!grupo?.nivelMax) return null;
+  const etiqueta = ETIQUETA_NIVEL[grupo.nivelMax];
+  return el('small', { class: `nivel ${colorNivel(grupo.nivelMax)}`, text: `Oleaje ${etiqueta.toLowerCase()}` });
+}
+
+function tarjeta(r, oleaje) {
   if (r.estado === 'sin-mar') {
     return el('article', { class: 'playa sin-datos' }, el('h3', { text: r.playa.nombre }), el('p', { text: 'No pude obtener el mar ahora. Reintenta más tarde.' }));
   }
   const resumen = el('summary', {},
-    el('span', { class: 'nombre', text: r.playa.nombre }),
+    el('span', { class: 'nombre', text: r.playa.nombre },
+      nivelDePlaya(r.playa, oleaje)),
     el('span', { class: `chip ${r.estado === 'ok' ? r.color : 'gris'}`, text: ETIQUETA_ESTADO[r.estado] ?? `${SIMBOLO[r.color]} ${r.bloque ? `${r.bloque.desde}–${r.bloque.hasta} h` : ETIQUETA[r.color]}` }));
   const filas = r.horas.map((h) => el('tr', { class: h.color },
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),

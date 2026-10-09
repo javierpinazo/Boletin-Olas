@@ -277,3 +277,57 @@ export function evaluarTsunami(boletines, ahoraMs) {
   }
   return { estado: 'ninguno', boletin: null };
 }
+
+// ---------- Oleaje anómalo del DHN en lenguaje llano: Leve / Medio / Alto ----------
+
+const ORDEN_NIVEL = ['normal', 'ligero', 'moderado', 'fuerte', 'muy fuerte'];
+export const ETIQUETA_NIVEL = {
+  normal: 'Normal', ligero: 'Leve', moderado: 'Medio', fuerte: 'Alto', 'muy fuerte': 'Alto (muy fuerte)',
+};
+
+function segmentosDelDia(tramo, aviso, fecha, ventana) {
+  const segmentos = [];
+  for (let h = ventana.horaInicio; h < ventana.horaFin; h++) {
+    const nivel = nivelEn(tramo, aviso, `${fecha}T${String(h).padStart(2, '0')}:00:00-05:00`);
+    const ultimo = segmentos[segmentos.length - 1];
+    if (ultimo && ultimo.nivel === nivel) ultimo.hasta = h + 1;
+    else segmentos.push({ desde: h, hasta: h + 1, nivel });
+  }
+  return segmentos;
+}
+
+// "Medio hasta las 12 h, luego Leve" / "Leve de 6 a 17 h" / "Sin aviso vigente del DHN".
+export function textoSegmentos(segmentos) {
+  const etiqueta = (n) => (n === null ? 'Sin aviso vigente del DHN' : ETIQUETA_NIVEL[n]);
+  if (segmentos.length === 1) {
+    const s = segmentos[0];
+    return s.nivel === null ? etiqueta(null) : `${etiqueta(s.nivel)} de ${s.desde} a ${s.hasta} h`;
+  }
+  return segmentos
+    .map((s, i) => (i === segmentos.length - 1 ? etiqueta(s.nivel) : `${etiqueta(s.nivel)} hasta las ${s.hasta} h`))
+    .join(', luego ');
+}
+
+// Nivel del aviso del DHN a lo largo de la ventana de `fecha`, agrupando las playas que comparten
+// tramo. null si no hay aviso. No usa datos del mar: es solo lo que dice el DHN.
+export function resumenOleajeDia({ aviso, playas, fecha, ventana }) {
+  if (!aviso) return null;
+  const grupos = new Map();
+  for (const playa of playas) {
+    const tramo = tramoParaPlaya(playa, aviso);
+    const clave = tramo?.nombre ?? null;
+    if (!grupos.has(clave)) {
+      const segmentos = tramo ? segmentosDelDia(tramo, aviso, fecha, ventana) : [];
+      const niveles = segmentos.map((s) => s.nivel).filter((n) => n !== null);
+      grupos.set(clave, {
+        tramo: clave,
+        playas: [],
+        segmentos,
+        nivelMax: niveles.length ? niveles.reduce((a, b) => (ORDEN_NIVEL.indexOf(b) > ORDEN_NIVEL.indexOf(a) ? b : a)) : null,
+        texto: tramo ? textoSegmentos(segmentos) : 'Esta playa no aparece en los tramos del aviso',
+      });
+    }
+    grupos.get(clave).playas.push(playa.nombre);
+  }
+  return { grupos: [...grupos.values()] };
+}

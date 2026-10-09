@@ -88,3 +88,13 @@ footer p { margin: 6px 0; }
 .gris { color: var(--suave); }
 .chip.gris { background: var(--borde); color: var(--suave); }
 .mejor.sin-horas { color: var(--suave); }
+
+.oleaje { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 16px; }
+.oleaje h2 { margin: 0 0 6px; font-size: .8rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.oleaje p { margin: 4px 0; }
+.nombre { display: flex; flex-direction: column; }
+.nivel { font-weight: 500; font-size: .78rem; }
+.nivel.verde { color: var(--verde); }
+.nivel.amarillo { color: var(--amarillo); }
+.nivel.rojo { color: var(--rojo); }
+.nivel.gris { color: var(--suave); }

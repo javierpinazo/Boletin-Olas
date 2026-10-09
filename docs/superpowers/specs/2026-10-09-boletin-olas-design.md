@@ -162,6 +162,9 @@ Móvil primero, una pantalla; HTML/CSS/JS planos; tema claro/oscuro automático;
 ícono (no solo color); PWA instalable sin modo offline.
 
 - Banner de alerta (solo si corresponde: tsunami o DHN fuerte/muy fuerte).
+- Bloque "Oleaje anómalo (DHN)" bajo las pestañas: nivel del día en lenguaje llano (Leve = ligero, Medio =
+  moderado, Alto = fuerte; muy fuerte se aclara) con sus cambios en la ventana 6–17 h, una línea por tramo si
+  difieren, y el nivel en cada tarjeta de playa. Sin aviso vigente dice "Sin aviso vigente del DHN", nunca "Normal".
 - Pestañas Hoy / Mañana / Pasado (Hoy por defecto).
 - "Mejor opción" del día: playa y bloque horario.
 - Una tarjeta por playa con su mejor bloque; al tocarla se abre la franja 06–17 h con color por hora y
