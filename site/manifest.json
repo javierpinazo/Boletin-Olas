@@ -1,0 +1,11 @@
+{
+  "name": "Boletín Olas",
+  "short_name": "Olas",
+  "description": "¿Es buen día para remar en mar calmo en Lima sur y Callao?",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f7fa",
+  "theme_color": "#0b5ea8",
+  "lang": "es",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

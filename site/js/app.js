@@ -1,0 +1,175 @@
+import { cargarMar, horasDelDia, ahoraLima } from './mar.js';
+import { evaluarPlayaDia, evaluarTsunami, mejorPlaya, estadoDhn } from './score.js';
+
+const SIMBOLO = { verde: '✔', amarillo: '⚠', rojo: '✖' };
+const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
+const ZONA = 'America/Lima';
+
+// Todo el texto remoto (DHN, Open-Meteo) entra con textContent: nunca como HTML.
+function el(tag, props = {}, ...hijos) {
+  const nodo = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') nodo.className = v;
+    else if (k === 'text') nodo.textContent = v;
+    else nodo.setAttribute(k, v);
+  }
+  for (const h of hijos.flat()) if (h) nodo.append(h);
+  return nodo;
+}
+
+const num1 = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
+const fmt = (ms, opts) => new Intl.DateTimeFormat('es-PE', { timeZone: ZONA, ...opts }).format(ms);
+const fechaCorta = (ms) => fmt(ms, { weekday: 'short', day: 'numeric', month: 'short' });
+const horaCorta = (ms) => fmt(ms, { hour: '2-digit', minute: '2-digit', hour12: false });
+
+async function cargarJson(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`${url}: ${r.status}`);
+  return r.json();
+}
+
+const estado = { dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0 };
+
+async function iniciar() {
+  const raiz = document.getElementById('app');
+  raiz.replaceChildren(el('p', { class: 'cargando', text: 'Consultando el mar y el aviso del DHN…' }));
+  estado.config = await cargarJson('./config.json');
+  estado.dhn = await cargarJson('./data/dhn.json').catch(() => null);
+  const resultados = await Promise.allSettled(estado.config.playas.map((p) => cargarMar(p)));
+  estado.mar = resultados.map((r) => (r.status === 'fulfilled' ? r.value : null));
+  estado.ahoraMs = Date.now();
+  estado.marMs = estado.ahoraMs;
+  pintar();
+}
+
+function fechaDelDia(offset) {
+  const base = ahoraLima(estado.ahoraMs).slice(0, 10);
+  const d = new Date(`${base}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+
+function evaluarTodo() {
+  const { config, dhn, ahoraMs } = estado;
+  const tsun = evaluarTsunami(dhn?.tsunami, ahoraMs);
+  const fecha = fechaDelDia(estado.dia);
+  const resultados = config.playas.map((playa, i) => {
+    const horas = estado.mar[i];
+    if (!horas) return { playa, sinMar: true, color: 'rojo', bloque: null, horas: [], notas: [], motivo: '' };
+    return evaluarPlayaDia({
+      playa,
+      horasCrudas: horasDelDia(horas, fecha, config.ventana, ahoraMs),
+      aviso: dhn?.aviso ?? null,
+      dhn,
+      ahoraMs,
+      config,
+      tsunamiAlerta: tsun.estado === 'alerta',
+    });
+  });
+  return { tsun, resultados };
+}
+
+function pintar() {
+  const { tsun, resultados } = evaluarTodo();
+  const raiz = document.getElementById('app');
+  const piezas = [
+    bannerTsunami(tsun),
+    bannerDhn(),
+    pestanas(),
+    mejorOpcion(resultados),
+    ...resultados.map(tarjeta),
+    pie(tsun),
+  ];
+  raiz.replaceChildren(...piezas.filter(Boolean));
+}
+
+function bannerTsunami(tsun) {
+  if (tsun.estado !== 'alerta') return null;
+  const b = tsun.boletin;
+  return el('section', { class: 'banner rojo', role: 'alert' },
+    el('strong', { text: `✖ Alerta del DHN: boletín de sismo/tsunami ${b.numero}` }),
+    el('p', { text: 'Todas las playas figuran en rojo. No salgas al mar: revisa dhn.mil.pe o la app MGP Tsunamis.' }),
+    el('details', {}, el('summary', { text: 'Texto del boletín' }), el('pre', { text: b.textoCrudo })));
+}
+
+function bannerDhn() {
+  const { dhn, ahoraMs, config } = estado;
+  const e = estadoDhn(dhn, ahoraMs, config.umbrales);
+  if (e === 'ok') return null;
+  const mensajes = {
+    ausente: 'No pude cargar los datos del DHN.',
+    obsoleto: 'Los datos del DHN llevan más de 36 horas sin actualizarse.',
+    errorParseo: 'No pude leer el último aviso del DHN.',
+  };
+  const crudo = dhn?.avisoCrudo;
+  return el('section', { class: 'banner amarillo', role: 'status' },
+    el('strong', { text: `⚠ ${mensajes[e]}` }),
+    el('p', { text: 'Ninguna playa pasa de amarillo hasta que revises el aviso en dhn.mil.pe.' }),
+    crudo ? el('details', {}, el('summary', { text: crudo.titulo }), el('pre', { text: crudo.texto })) : null);
+}
+
+function pestanas() {
+  const etiquetas = ['Hoy', 'Mañana', 'Pasado'];
+  return el('nav', { class: 'dias', 'aria-label': 'Día' }, etiquetas.map((t, i) => {
+    const b = el('button', { type: 'button', text: `${t} · ${fechaCorta(Date.parse(`${fechaDelDia(i)}T12:00:00-05:00`))}`, 'aria-pressed': String(i === estado.dia) });
+    b.addEventListener('click', () => { estado.dia = i; pintar(); });
+    return b;
+  }));
+}
+
+function mejorOpcion(resultados) {
+  const mejor = mejorPlaya(resultados);
+  if (resultados.every((r) => !r.sinMar && r.horas.length === 0)) {
+    return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'Ya no quedan horas hoy' }), el('p', { text: 'La ventana de remo es de 6 a 17 h. Mira Mañana.' }));
+  }
+  if (!mejor) {
+    return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'Ninguna playa apta' }), el('p', { text: 'Con los datos actuales no hay un bloque de 2 horas o más para remar en mar calmo.' }));
+  }
+  return el('section', { class: `mejor ${mejor.color}` },
+    el('p', { class: 'sobre', text: 'Mejor opción' }),
+    el('h2', { text: `${SIMBOLO[mejor.color]} ${mejor.playa.nombre} · ${mejor.bloque.desde}–${mejor.bloque.hasta} h` }));
+}
+
+function tarjeta(r) {
+  if (r.sinMar) {
+    return el('article', { class: 'playa sin-datos' }, el('h3', { text: r.playa.nombre }), el('p', { text: 'No pude obtener el mar ahora. Reintenta más tarde.' }));
+  }
+  const resumen = el('summary', {},
+    el('span', { class: 'nombre', text: r.playa.nombre }),
+    el('span', { class: `chip ${r.horas.length === 0 ? 'gris' : r.color}`, text: r.horas.length === 0 ? 'Sin horas' : `${SIMBOLO[r.color]} ${r.bloque ? `${r.bloque.desde}–${r.bloque.hasta} h` : ETIQUETA[r.color]}` }));
+  const filas = r.horas.map((h) => el('tr', { class: h.color },
+    el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
+    el('td', { text: h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m` }),
+    el('td', { text: h.dato.tp === null ? '—' : `${num1(h.dato.tp)} s` }),
+    el('td', { text: h.dato.vientoKmh === null ? '—' : `${Math.round(h.dato.vientoKmh)} km/h` }),
+    el('td', { text: `${SIMBOLO[h.color]} ${ETIQUETA[h.color]}` })));
+  return el('article', { class: 'playa' },
+    el('details', {}, resumen,
+      el('p', { class: 'motivo', text: r.motivo }),
+      ...r.notas.map((n) => el('p', { class: 'nota', text: n })),
+      r.horas.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Hora', 'Ola', 'Periodo', 'Viento', 'Estado'].map((t) => el('th', { text: t })))), el('tbody', {}, filas)) : null));
+}
+
+function pie(tsun) {
+  const { dhn, marMs } = estado;
+  const aviso = dhn?.aviso;
+  const lineas = [];
+  if (aviso) {
+    lineas.push(el('p', {}, `DHN: aviso ${aviso.numero}, válido hasta el ${aviso.validoHasta.split('-').reverse().join('/')}. `, el('a', { href: aviso.url, text: 'Ver aviso', rel: 'noopener' })));
+  }
+  if (tsun.estado === 'informativo') {
+    const b = tsun.boletin;
+    lineas.push(el('p', { class: 'gris', text: `Sismo ${b.magnitud ?? '?'} Mw ${b.lugar ?? ''}: sin tsunami en el litoral peruano (boletín ${b.numero}).` }));
+  }
+  lineas.push(el('p', { class: 'gris', text: `Datos del DHN leídos: ${dhn ? `${fechaCorta(Date.parse(dhn.generadoEn))} ${horaCorta(Date.parse(dhn.generadoEn))}` : 'no disponible'} · Mar consultado: ${horaCorta(marMs)}` }));
+  lineas.push(el('p', { class: 'gris', text: 'Los datos de oleaje son de modelo (Open-Meteo), no medidos en la orilla; San Bartolo, Punta Hermosa y Yuyos pueden compartir la misma celda. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
+  lineas.push(el('p', { class: 'gris' },
+    el('a', { href: 'https://www.dhn.mil.pe/portal/', text: 'dhn.mil.pe', rel: 'noopener' }), ' · ',
+    el('a', { href: 'https://www.dhn.mil.pe/portal/boletin-diario-condiciones-oceanograficas', text: 'Boletín oceanográfico diario', rel: 'noopener' }), ' · ',
+    el('a', { href: 'https://www.dhn.mil.pe/portal/boletin-sismo-tsunami', text: 'Sismo y tsunami', rel: 'noopener' })));
+  return el('footer', {}, lineas);
+}
+
+iniciar().catch((e) => {
+  document.getElementById('app').replaceChildren(el('section', { class: 'banner rojo', role: 'alert' }, el('strong', { text: 'No pude iniciar la página.' }), el('p', { text: String(e.message) })));
+});
