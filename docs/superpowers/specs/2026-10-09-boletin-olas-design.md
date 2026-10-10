@@ -105,6 +105,11 @@ muestra, por playa, el mejor bloque de 2 h o más seguidas y el motivo en una l�
 
 - El aviso del DHN actúa como **tope**: con "moderado" en el tramo la hora no pasa de amarillo.
 - El terral tiene umbrales más estrictos porque empuja a quien se cae hacia mar abierto.
+- Factor de ola por playa (`factorOla` en config.json, 1 si falta): Open-Meteo da la ola de su celda de mar abierto,
+  que en la zona tranquila donde se rema suele ser bastante menor. La ola del modelo se multiplica por el factor antes
+  de evaluar umbrales y escala (calibrado el 2026-10-10 con una estimación del usuario: DHN leve ≈ 0,5 m en su zona
+  frente a 1,6 m del modelo → 0,31). La tabla muestra la ola corregida y, en gris, la del modelo. No afecta a las
+  alertas (tsunami, DHN fuerte).
 - Los umbrales viven en `site/config.json` y se calibran con salidas reales (los valores de Open-Meteo
   son de modelo, no medidos en orilla; las bahías protegidas suelen tener menos ola que el dato).
 

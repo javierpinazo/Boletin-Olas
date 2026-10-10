@@ -9,9 +9,9 @@
   },
   "ventana": { "horaInicio": 6, "horaFin": 17 },
   "playas": [
-    { "id": "san-bartolo", "nombre": "San Bartolo", "lat": -12.389, "lon": -76.779 },
-    { "id": "punta-hermosa", "nombre": "Punta Hermosa", "lat": -12.337, "lon": -76.826 },
-    { "id": "yuyos", "nombre": "Yuyos", "lat": -12.37, "lon": -76.797 },
-    { "id": "la-punta", "nombre": "La Punta", "lat": -12.071, "lon": -77.164, "latTramo": -12.05 }
+    { "id": "san-bartolo", "nombre": "San Bartolo", "lat": -12.389, "lon": -76.779, "factorOla": 0.31 },
+    { "id": "punta-hermosa", "nombre": "Punta Hermosa", "lat": -12.337, "lon": -76.826, "factorOla": 0.31 },
+    { "id": "yuyos", "nombre": "Yuyos", "lat": -12.37, "lon": -76.797, "factorOla": 0.31 },
+    { "id": "la-punta", "nombre": "La Punta", "lat": -12.071, "lon": -77.164, "factorOla": 0.31, "latTramo": -12.05 }
   ]
 }

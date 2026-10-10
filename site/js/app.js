@@ -201,13 +201,18 @@ function tarjeta(r, oleaje) {
     chipDePlaya(r));
   const filas = r.horas.map((h) => el('tr', { class: h.color },
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
-    el('td', { text: h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m` }),
+    el('td', {},
+      h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m`,
+      h.dato.hsModelo ? el('small', { class: 'gris', text: ` (modelo ${num1(h.dato.hsModelo)} m)` }) : null),
     el('td', { text: h.dato.tp === null ? '—' : `${num1(h.dato.tp)} s` }),
     el('td', { text: h.dato.vientoKmh === null ? '—' : `${Math.round(h.dato.vientoKmh)} km/h` }),
     el('td', { text: `${SIMBOLO[h.color]} ${ETIQUETA[h.color]}` })));
   return el('article', { class: 'playa' },
     el('details', {}, resumen,
       el('p', { class: 'motivo', text: r.motivo }),
+      r.factorOla !== 1
+        ? el('p', { class: 'nota gris', text: `Ola en tu zona = ola del modelo × ${String(r.factorOla).replace('.', ',')} (ajustable en config.json).` })
+        : null,
       ...r.notas.map((n) => el('p', { class: 'nota', text: n })),
       r.horas.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Hora', 'Ola', 'Periodo', 'Viento', 'Estado'].map((t) => el('th', { text: t })))), el('tbody', {}, filas)) : null));
 }

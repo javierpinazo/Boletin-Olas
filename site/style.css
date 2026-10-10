@@ -104,3 +104,4 @@ footer p { margin: 6px 0; }
 .nivel.amarillo { color: var(--amarillo); }
 .nivel.rojo { color: var(--rojo); }
 .nivel.gris { color: var(--suave); }
+.nota.gris { color: var(--suave); }

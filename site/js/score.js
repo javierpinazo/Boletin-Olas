@@ -172,8 +172,16 @@ function mejorRacha(horas, aceptable, minHoras) {
 }
 
 // horasCrudas: [{hora:'2026-10-09T06:00', hs, tp, vientoKmh, dirViento}], ya filtradas a la ventana.
-export function evaluarPlayaDia({ playa, horasCrudas, aviso, dhn, ahoraMs, config, tsunamiAlerta = false }) {
+// Open-Meteo da la ola de su celda de mar abierto; en la zona tranquila donde se rema suele ser bastante
+// menor. `playa.factorOla` (config.json, 1 si falta) la corrige; la ola original queda en `hsModelo`.
+const corregirOla = (dato, factor) => (sinDato(dato.hs) || factor === 1
+  ? dato
+  : { ...dato, hsModelo: dato.hs, hs: Math.round(dato.hs * factor * 100) / 100 });
+
+export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn, ahoraMs, config, tsunamiAlerta = false }) {
   const u = config.umbrales;
+  const factorOla = playa.factorOla ?? 1;
+  const horasCrudas = horasDelModelo.map((dato) => corregirOla(dato, factorOla));
   const estDhn = estadoDhn(dhn, ahoraMs, u);
   const tramo = aviso ? tramoParaPlaya(playa, aviso) : null;
   const notas = [];
@@ -238,10 +246,14 @@ export function evaluarPlayaDia({ playa, horasCrudas, aviso, dhn, ahoraMs, confi
   if (tsunamiAlerta) causa = 'Alerta de sismo/tsunami del DHN';
   else if (dhnAlto) causa = 'Oleaje Alto según el DHN';
   else if (hsMedia !== null && hsMedia > u.altura.verde) {
-    causa = `Olas de ${f1(hsMedia)} m según el modelo; para mar calmo conviene menos de ${f1(u.altura.verde)} m`;
+    const delModelo = horas.map((h) => h.dato.hsModelo ?? h.dato.hs).filter((v) => !sinDato(v));
+    const modeloMedia = delModelo.reduce((a, b) => a + b, 0) / delModelo.length;
+    causa = factorOla === 1
+      ? `Olas de ${f1(hsMedia)} m según el modelo; para mar calmo conviene menos de ${f1(u.altura.verde)} m`
+      : `Olas de ${f1(hsMedia)} m en tu zona (modelo: ${f1(modeloMedia)} m); para mar calmo conviene menos de ${f1(u.altura.verde)} m`;
   } else causa = motivo;
 
-  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa };
+  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa, factorOla };
 }
 
 // Playa para la que Open-Meteo no respondió: sin semáforo.

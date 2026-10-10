@@ -12,7 +12,8 @@ import {
 const FX = new URL('./fixtures/', import.meta.url);
 const config = JSON.parse(fs.readFileSync(new URL('../site/config.json', import.meta.url), 'utf8'));
 const u = config.umbrales;
-const playa = (id) => config.playas.find((p) => p.id === id);
+// Los tests de umbrales usan la ola del modelo tal cual (factor 1); el factor real se prueba aparte.
+const playa = (id) => ({ ...config.playas.find((p) => p.id === id), factorOla: 1 });
 const aviso39 = parseAviso(separarItems(fs.readFileSync(new URL('avisos-oleaje.html', FX), 'utf8'))[0]);
 
 test('altura: límites exactos', () => {
@@ -395,4 +396,59 @@ test('estadoDia ninguna: con olas calmas pero sin bloque la causa es el motivo (
   assert.equal(e.tipo, 'ninguna');
   assert.equal(e.grado, 'calmo');
   assert.equal(e.causa, 'No apto: viento de 25 km/h');
+});
+
+// ---------- Factor de ola por playa (el modelo da la ola de mar abierto, no la de la zona tranquila) ----------
+
+const conFactor = (id, factorOla) => ({ ...playa(id), factorOla });
+const evaluarFactor = (p, horas) => evaluarPlayaDia({ playa: p, horasCrudas: horas, aviso: aviso39, dhn, ahoraMs, config });
+const horasModelo = (hs) => dia([12, 13, 14].map((h) => [h, hs, 11.8, 7, 200]));
+
+test('factorOla: 1,6 m del modelo x 0,31 = 0,5 m en la zona tranquila (verde, Mar calmo)', () => {
+  const r = evaluarFactor(conFactor('yuyos', 0.31), horasModelo(1.6));
+  assert.equal(r.horas[0].dato.hs, 0.5);
+  assert.equal(r.horas[0].dato.hsModelo, 1.6);
+  assert.equal(r.hsMedia, 0.5);
+  assert.equal(r.grado, 'calmo');
+  assert.equal(r.color, 'verde');
+});
+
+test('factorOla: sin factor vale 1 (la ola del modelo sin corregir)', () => {
+  const p = playa('yuyos');
+  delete p.factorOla;
+  const r = evaluarFactor(p, horasModelo(1.6));
+  assert.equal(r.horas[0].dato.hs, 1.6);
+  assert.equal(r.grado, 'movido');
+});
+
+test('factorOla: un dato de ola faltante sigue faltando (no se inventa 0)', () => {
+  const r = evaluarFactor(conFactor('yuyos', 0.31), dia([[12, null, null, 7, 200], [13, null, null, 7, 200]]));
+  assert.equal(r.horas[0].dato.hs, null);
+  assert.equal(r.hsMedia, null);
+  assert.equal(r.grado, null);
+});
+
+test('factorOla: la causa dice la ola de tu zona y la del modelo', () => {
+  const r = evaluarFactor(conFactor('yuyos', 0.7), horasModelo(1.6));
+  assert.equal(r.hsMedia, 1.12);
+  assert.equal(r.causa, 'Olas de 1,1 m en tu zona (modelo: 1,6 m); para mar calmo conviene menos de 0,8 m');
+});
+
+test('factorOla: no apaga las alertas (tsunami y DHN Alto siguen en rojo aunque la ola corregida sea chica)', () => {
+  const t = evaluarPlayaDia({ playa: conFactor('yuyos', 0.31), horasCrudas: horasModelo(1.6), aviso: aviso39, dhn, ahoraMs, config, tsunamiAlerta: true });
+  assert.equal(t.grado, 'agitado');
+  assert.equal(t.color, 'rojo');
+});
+
+test('factorOla: la ola corregida también baja el rojo por periodo largo a amarillo', () => {
+  const horas = dia([12, 13].map((h) => [h, 2.4, 16, 7, 200]));
+  const periodo = (r) => r.horas[0].razones.find((x) => x.factor === 'periodo').color;
+  assert.equal(periodo(evaluarFactor(playa('yuyos'), horas)), 'rojo', 'sin factor: ola 2,4 m con periodo de 16 s');
+  assert.equal(periodo(evaluarFactor(conFactor('yuyos', 0.31), horas)), 'amarillo', 'con factor: ola de 0,74 m y periodo largo');
+});
+
+test('config: cada playa trae un factorOla razonable (0 < f <= 1,5)', () => {
+  for (const p of config.playas) {
+    assert.ok(typeof p.factorOla === 'number' && p.factorOla > 0 && p.factorOla <= 1.5, `${p.nombre}: factorOla=${p.factorOla}`);
+  }
 });
