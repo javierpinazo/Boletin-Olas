@@ -59,3 +59,12 @@ navegador ──▶ Open-Meteo (oleaje, viento, mareas) en vivo
   `dhn.json`. No hay que hacer nada.
 - **Quitarlo:** desactivar el flujo en n8n, borrar la línea de `authorized_keys` que dice `n8n-boletin-olas`, y
   `sudo rm /etc/nginx/sites-enabled/olas.veripago.pe && sudo systemctl reload nginx`.
+
+## Estado y notas (2026-10-10)
+
+- DNS: `olas` (A → IP de la VPS) en Cloudflare, con proxy. Certificado emitido con el certbot del host
+  (vence el 2027-01-08; lo renueva el cron diario ya existente).
+- Cloudflare va por delante: tras un despliegue (`actualizar-codigo.sh`) puede tardar unos minutos en llegar la
+  versión nueva a todos los navegadores; con **Ctrl+F5** se fuerza. Los datos (`data/dhn.json`) van con `no-store`.
+- Mientras el flujo de n8n no esté activo, `dhn.json` solo se actualiza al ejecutar `actualizar.sh` o
+  `actualizar-codigo.sh` a mano, y la página mostrará el banner de "datos del DHN con más de 3 horas".
