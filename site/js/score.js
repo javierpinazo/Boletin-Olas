@@ -42,16 +42,42 @@ export function colorPeriodo(tp, hs, u) {
   return { color: VERDE, texto: `Periodo de ${f1(tp)} s` };
 }
 
-export function esTerral(dirViento, u) {
-  return dirViento >= u.terral.dirDesde && dirViento <= u.terral.dirHasta;
+// Diferencia angular mínima entre dos rumbos (0–180°).
+const diferenciaAngular = (a, b) => {
+  const d = Math.abs((((a - b) % 360) + 360) % 360);
+  return d > 180 ? 360 - d : d;
+};
+
+// Terral: el viento sale de tierra y empuja mar adentro. Con la orientación de la playa (hacia dónde mira
+// el mar, en grados) la tierra queda en orientacion + 180; sin ella se usa el rango global del config.
+export function esTerral(dirViento, u, orientacion) {
+  if (orientacion === undefined || orientacion === null) {
+    return dirViento >= u.terral.dirDesde && dirViento <= u.terral.dirHasta;
+  }
+  return diferenciaAngular(dirViento, orientacion + 180) <= u.terral.semiancho;
 }
 
-export function colorViento(kmh, dirViento, u) {
+// Cuánto de la ola de la celda llega a una playa según de dónde viene: de frente (la ola viene desde el
+// mar hacia el que mira la playa) entera; de costado o de espaldas, menos. Sin datos, 1 (no corrige).
+export function factorExposicion(dirOla, orientacion, u) {
+  if (sinDato(dirOla) || orientacion === undefined || orientacion === null) return 1;
+  const d = diferenciaAngular(dirOla, orientacion);
+  return u.exposicionOla.find((t) => d <= t.hasta)?.factor ?? 1;
+}
+
+export function colorRafaga(kmh, u) {
+  const texto = `Ráfagas de ${Math.round(kmh)} km/h`;
+  if (kmh <= u.rafagas.verde) return { color: VERDE, texto };
+  if (kmh <= u.rafagas.amarillo) return { color: AMARILLO, texto };
+  return { color: ROJO, texto: `${texto}, peligrosas` };
+}
+
+export function colorViento(kmh, dirViento, u, orientacion) {
   const general =
     kmh <= u.viento.verde ? VERDE : kmh <= u.viento.amarillo ? AMARILLO : ROJO;
   let color = general;
   let texto = `Viento de ${Math.round(kmh)} km/h`;
-  if (esTerral(dirViento, u)) {
+  if (esTerral(dirViento, u, orientacion)) {
     const t = u.terral;
     const colorTerral = kmh <= t.verde ? VERDE : kmh <= t.amarillo ? AMARILLO : ROJO;
     if (ORDEN[colorTerral] > ORDEN[color]) color = colorTerral;
@@ -118,7 +144,7 @@ export function estadoDhn(dhn, ahoraMs, u) {
 const sinDato = (n) => n === null || n === undefined || Number.isNaN(n);
 
 export function evaluarHora(dato, ctx) {
-  const { umbrales: u, nivelDhn, estado, tsunamiAlerta } = ctx;
+  const { umbrales: u, nivelDhn, estado, tsunamiAlerta, orientacion } = ctx;
   const razones = [];
   if (tsunamiAlerta) {
     razones.push({ factor: 'tsunami', color: ROJO, texto: 'Alerta de sismo/tsunami del DHN' });
@@ -132,7 +158,13 @@ export function evaluarHora(dato, ctx) {
   if (sinDato(dato.vientoKmh) || sinDato(dato.dirViento)) {
     razones.push({ factor: 'viento', color: AMARILLO, texto: 'Sin dato de viento para esta hora' });
   } else {
-    razones.push({ factor: 'viento', ...colorViento(dato.vientoKmh, dato.dirViento, u) });
+    razones.push({ factor: 'viento', ...colorViento(dato.vientoKmh, dato.dirViento, u, orientacion) });
+  }
+  // Las ráfagas solo cuentan si la fuente las trae (el campo existe); si existe pero vino vacío, amarillo.
+  if ('rafagaKmh' in dato) {
+    razones.push(sinDato(dato.rafagaKmh)
+      ? { factor: 'rafagas', color: AMARILLO, texto: 'Sin dato de ráfagas para esta hora' }
+      : { factor: 'rafagas', ...colorRafaga(dato.rafagaKmh, u) });
   }
   let dhn = colorDhn(nivelDhn);
   if (estado !== 'ok' && dhn.color === VERDE) {
@@ -174,14 +206,30 @@ function mejorRacha(horas, aceptable, minHoras) {
 // horasCrudas: [{hora:'2026-10-09T06:00', hs, tp, vientoKmh, dirViento}], ya filtradas a la ventana.
 // Open-Meteo da la ola de su celda de mar abierto; en la zona tranquila donde se rema suele ser bastante
 // menor. `playa.factorOla` (config.json, 1 si falta) la corrige; la ola original queda en `hsModelo`.
-const corregirOla = (dato, factor) => (sinDato(dato.hs) || factor === 1
-  ? dato
-  : { ...dato, hsModelo: dato.hs, hs: Math.round(dato.hs * factor * 100) / 100 });
+// Además, si la ola llega de costado o de espaldas a la playa (orientación), solo llega una parte.
+function corregirOla(dato, factorOla, orientacion, u) {
+  if (sinDato(dato.hs)) return dato;
+  const exposicion = factorExposicion(dato.dirOla, orientacion, u);
+  const factor = factorOla * exposicion;
+  if (factor === 1) return dato;
+  return {
+    ...dato,
+    hsModelo: dato.hs,
+    hs: Math.round(dato.hs * factor * 100) / 100,
+    ...(exposicion < 1 ? { exposicion } : {}),
+  };
+}
+
+// Texto de por qué una hora no es verde: la(s) razón(es) de su peor color.
+export function motivoHora(hora) {
+  if (hora.color === VERDE) return '';
+  return [...new Set(hora.razones.filter((r) => r.color === hora.color).map((r) => r.texto))].join(' · ');
+}
 
 export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn, ahoraMs, config, tsunamiAlerta = false }) {
   const u = config.umbrales;
   const factorOla = playa.factorOla ?? 1;
-  const horasCrudas = horasDelModelo.map((dato) => corregirOla(dato, factorOla));
+  const horasCrudas = horasDelModelo.map((dato) => corregirOla(dato, factorOla, playa.orientacion, u));
   const estDhn = estadoDhn(dhn, ahoraMs, u);
   const tramo = aviso ? tramoParaPlaya(playa, aviso) : null;
   const notas = [];
@@ -197,7 +245,9 @@ export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn
   const horas = horasCrudas.map((dato) => {
     let nivelDhn = null;
     if (aviso && tramo) nivelDhn = nivelEn(tramo, aviso, `${dato.hora}:00-05:00`);
-    return evaluarHora(dato, { umbrales: u, nivelDhn, estado: aviso && tramo ? estDhn : 'ausente', tsunamiAlerta });
+    return evaluarHora(dato, {
+      umbrales: u, nivelDhn, estado: aviso && tramo ? estDhn : 'ausente', tsunamiAlerta, orientacion: playa.orientacion,
+    });
   });
 
   const min = u.bloqueMinHoras;

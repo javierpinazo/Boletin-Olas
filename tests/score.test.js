@@ -7,6 +7,7 @@ import { parseTsunami } from '../job/parse-tsunami.js';
 import {
   colorAltura, colorPeriodo, colorViento, colorDhn, tramoParaPlaya, nivelEn, estadoDhn,
   evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, gradoMar, ETIQUETA_GRADO, COLOR_GRADO,
+  esTerral, colorRafaga, factorExposicion, motivoHora,
 } from '../site/js/score.js';
 
 const FX = new URL('./fixtures/', import.meta.url);
@@ -451,4 +452,92 @@ test('config: cada playa trae un factorOla razonable (0 < f <= 1,5)', () => {
   for (const p of config.playas) {
     assert.ok(typeof p.factorOla === 'number' && p.factorOla > 0 && p.factorOla <= 1.5, `${p.nombre}: factorOla=${p.factorOla}`);
   }
+});
+
+// ---------- Orientación de cada playa: terral y exposición a la ola ----------
+
+test('terral por playa: viento que sale de tierra (±70° de la dirección opuesta al mar)', () => {
+  // Playa que mira al oeste-suroeste (260°): la tierra está hacia los 80°.
+  assert.equal(esTerral(80, u, 260), true);
+  assert.equal(esTerral(10, u, 260), true, '80 - 70');
+  assert.equal(esTerral(150, u, 260), true, '80 + 70');
+  assert.equal(esTerral(151, u, 260), false);
+  assert.equal(esTerral(200, u, 260), false, 'viento del mar');
+  // Bahía que mira al norte (15°): la tierra está hacia los 195°, así que el viento del sur es terral.
+  assert.equal(esTerral(200, u, 15), true);
+  assert.equal(esTerral(20, u, 15), false);
+});
+
+test('terral sin orientación: rango global del config (compatibilidad)', () => {
+  assert.equal(esTerral(90, u), true);
+  assert.equal(esTerral(200, u), false);
+});
+
+test('colorViento usa la orientación de la playa si se la pasan', () => {
+  assert.equal(colorViento(12, 200, u, 15).color, 'amarillo', 'terral en la bahía: 12 km/h > 8');
+  assert.equal(colorViento(12, 200, u, 260).color, 'verde', 'del mar en la playa abierta');
+});
+
+test('exposición a la ola: de frente 1, de costado 0,6, de espaldas 0,3', () => {
+  assert.equal(factorExposicion(205, 225, u), 1, 'diferencia 20°');
+  assert.equal(factorExposicion(180, 225, u), 1, 'diferencia 45°');
+  assert.equal(factorExposicion(205, 295, u), 0.6, 'diferencia 90°');
+  assert.equal(factorExposicion(205, 15, u), 0.3, 'diferencia 170°');
+  assert.equal(factorExposicion(null, 225, u), 1, 'sin dirección de ola no se corrige');
+  assert.equal(factorExposicion(205, undefined, u), 1, 'sin orientación no se corrige');
+});
+
+test('playa-día: la exposición se suma al factor de ola y queda a la vista', () => {
+  const bahia = { ...playa('la-punta'), factorOla: 1, orientacion: 15 };
+  const horas = dia([[12, 1.6, 11.8, 5, 300], [13, 1.6, 11.8, 5, 300]]).map((h) => ({ ...h, dirOla: 205 }));
+  const r = evaluarPlayaDia({ playa: bahia, horasCrudas: horas, aviso: aviso39, dhn, ahoraMs, config });
+  assert.equal(r.horas[0].dato.hs, 0.48);
+  assert.equal(r.horas[0].dato.hsModelo, 1.6);
+  assert.equal(r.horas[0].dato.exposicion, 0.3);
+  const abierta = { ...playa('san-bartolo'), factorOla: 0.31, orientacion: 225 };
+  const r2 = evaluarPlayaDia({ playa: abierta, horasCrudas: horas, aviso: aviso39, dhn, ahoraMs, config });
+  assert.equal(r2.horas[0].dato.hs, 0.5, 'de frente: solo el factor de ola');
+  assert.equal(r2.horas[0].dato.exposicion, undefined);
+});
+
+// ---------- Ráfagas ----------
+
+test('ráfagas: verde hasta 20, amarillo hasta 30, rojo por encima', () => {
+  assert.equal(colorRafaga(20, u).color, 'verde');
+  assert.equal(colorRafaga(20.5, u).color, 'amarillo');
+  assert.equal(colorRafaga(30, u).color, 'amarillo');
+  assert.equal(colorRafaga(31, u).color, 'rojo');
+  assert.match(colorRafaga(33.5, u).texto, /^Ráfagas de 34 km\/h/);
+});
+
+test('ráfagas en la hora: dato faltante da amarillo; si la fuente no las trae (campo ausente) no cuentan', () => {
+  const ctx = { umbrales: u, nivelDhn: 'ligero', estado: 'ok', tsunamiAlerta: false };
+  const base = { hora: '2026-10-10T07:00', hs: 0.5, tp: 9, vientoKmh: 6, dirViento: 200 };
+  assert.equal(evaluarHora({ ...base, rafagaKmh: 15 }, ctx).color, 'verde');
+  assert.equal(evaluarHora({ ...base, rafagaKmh: 35 }, ctx).color, 'rojo');
+  assert.equal(evaluarHora({ ...base, rafagaKmh: null }, ctx).color, 'amarillo');
+  assert.equal(evaluarHora(base, ctx).color, 'verde');
+});
+
+// ---------- Motivo por hora ----------
+
+test('motivoHora: vacío si es verde; si no, la(s) razón(es) del peor color', () => {
+  const ctx = { umbrales: u, nivelDhn: 'ligero', estado: 'ok', tsunamiAlerta: false };
+  const base = { hora: '2026-10-10T07:00', hs: 0.5, tp: 9, vientoKmh: 6, dirViento: 200, rafagaKmh: 15 };
+  assert.equal(motivoHora(evaluarHora(base, ctx)), '');
+  assert.equal(motivoHora(evaluarHora({ ...base, vientoKmh: 15 }, ctx)), 'Viento de 15 km/h');
+  assert.equal(motivoHora(evaluarHora({ ...base, hs: 1.5, vientoKmh: 15 }, ctx)), 'Olas de 1,5 m, demasiado altas');
+  assert.equal(motivoHora(evaluarHora({ ...base, vientoKmh: 15, rafagaKmh: 25 }, ctx)), 'Viento de 15 km/h · Ráfagas de 25 km/h');
+});
+
+// ---------- Config: orientación y Yuyos en Barranco ----------
+
+test('config: cada playa trae una orientación entre 0 y 359°', () => {
+  for (const p of config.playas) assert.ok(Number.isFinite(p.orientacion) && p.orientacion >= 0 && p.orientacion < 360, p.nombre);
+});
+
+test('config: Yuyos es Los Yuyos de Barranco (Costa Verde)', () => {
+  const y = config.playas.find((p) => p.id === 'yuyos');
+  assert.ok(Math.abs(y.lat - -12.149) < 0.02 && Math.abs(y.lon - -77.026) < 0.02, `${y.lat}, ${y.lon}`);
+  assert.match(tramoParaPlaya(y, aviso39).nombre, /Callao hasta San Juan de Marcona/);
 });
