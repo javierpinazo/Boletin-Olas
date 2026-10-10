@@ -1,0 +1,27 @@
+{
+  "name": "Boletín Olas — avisar si falla",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0101",
+      "name": "Si falla un flujo",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {},
+      "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0102",
+      "name": "Aquí tu aviso (Telegram, correo…)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [260, 0]
+    }
+  ],
+  "connections": {
+    "Si falla un flujo": {
+      "main": [[{ "node": "Aquí tu aviso (Telegram, correo…)", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "timezone": "America/Lima" }
+}

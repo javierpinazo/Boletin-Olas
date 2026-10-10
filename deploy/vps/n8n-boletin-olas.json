@@ -1,0 +1,84 @@
+{
+  "name": "Boletín Olas — leer el DHN cada hora",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 1 }
+          ]
+        }
+      },
+      "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0001",
+      "name": "Cada hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "command": "/opt/boletin-olas/deploy/vps/actualizar.sh"
+      },
+      "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0002",
+      "name": "Leer DHN y armar sitio",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [240, 0],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "sshPrivateKey": {
+          "id": "",
+          "name": "Boletín Olas (host de la VPS)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            {
+              "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0010",
+              "leftValue": "={{ $json.code ?? 1 }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0003",
+      "name": "¿Falló?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "errorMessage": "={{ 'Boletín Olas: la lectura del DHN falló (código ' + ($json.code ?? 'sin respuesta') + '). ' + ($json.stderr ?? $json.error ?? '') }}"
+      },
+      "id": "6f1d1d2c-3a0e-4d57-9b6a-0c2f6d1a0004",
+      "name": "Marcar ejecución fallida",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [720, -80]
+    }
+  ],
+  "connections": {
+    "Cada hora": {
+      "main": [[{ "node": "Leer DHN y armar sitio", "type": "main", "index": 0 }]]
+    },
+    "Leer DHN y armar sitio": {
+      "main": [[{ "node": "¿Falló?", "type": "main", "index": 0 }]]
+    },
+    "¿Falló?": {
+      "main": [[{ "node": "Marcar ejecución fallida", "type": "main", "index": 0 }], []]
+    }
+  },
+  "settings": {
+    "timezone": "America/Lima",
+    "executionTimeout": 120,
+    "saveManualExecutions": true
+  }
+}

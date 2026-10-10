@@ -83,12 +83,18 @@ test('nivelEn sigue la línea de tiempo y vence con el aviso', () => {
   assert.equal(nivelEn(t, aviso39, '2026-10-13T00:00:00-05:00'), null);
 });
 
-test('estadoDhn', () => {
+test('estadoDhn: ok hasta horasMaxDhn desde la última lectura; después obsoleto', () => {
   const ahora = Date.parse('2026-10-09T15:00:00Z');
+  const hace = (horas) => new Date(ahora - horas * 3600 * 1000).toISOString();
   assert.equal(estadoDhn(null, ahora, u), 'ausente');
-  assert.equal(estadoDhn({ generadoEn: '2026-10-09T10:31:00Z' }, ahora, u), 'ok');
-  assert.equal(estadoDhn({ generadoEn: '2026-10-07T10:31:00Z' }, ahora, u), 'obsoleto');
-  assert.equal(estadoDhn({ generadoEn: '2026-10-09T10:31:00Z', parseError: true }, ahora, u), 'errorParseo');
+  assert.equal(estadoDhn({ generadoEn: hace(1) }, ahora, u), 'ok');
+  assert.equal(estadoDhn({ generadoEn: hace(u.horasMaxDhn) }, ahora, u), 'ok', 'justo en el límite');
+  assert.equal(estadoDhn({ generadoEn: hace(u.horasMaxDhn + 0.1) }, ahora, u), 'obsoleto');
+  assert.equal(estadoDhn({ generadoEn: hace(1), parseError: true }, ahora, u), 'errorParseo');
+});
+
+test('config: con lectura del DHN cada hora, los datos se consideran viejos a las 3 h', () => {
+  assert.equal(u.horasMaxDhn, 3);
 });
 
 test('evaluarHora: el peor factor manda y datos faltantes no dan verde', () => {

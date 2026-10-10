@@ -157,7 +157,7 @@ function bannerDhn() {
   if (e === 'ok') return null;
   const mensajes = {
     ausente: 'No pude cargar los datos del DHN.',
-    obsoleto: 'Los datos del DHN llevan más de 36 horas sin actualizarse.',
+    obsoleto: `Los datos del DHN llevan más de ${config.umbrales.horasMaxDhn} horas sin actualizarse.`,
     errorParseo: 'No pude leer el último aviso del DHN.',
   };
   const crudo = dhn?.avisoCrudo;

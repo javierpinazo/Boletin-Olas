@@ -11,7 +11,7 @@
       { "hasta": 180, "factor": 0.3 }
     ],
     "bloqueMinHoras": 2,
-    "horasMaxDhn": 36
+    "horasMaxDhn": 3
   },
   "ventana": { "horaInicio": 6, "horaFin": 17 },
   "playas": [
