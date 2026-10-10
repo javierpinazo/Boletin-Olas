@@ -1,7 +1,7 @@
 import { cargarMar, horasDelDia, ahoraLima, mareasDelDia } from './mar.js';
 import {
   evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, ETIQUETA_NIVEL,
-  ETIQUETA_GRADO, COLOR_GRADO, motivoHora,
+  describirSinBloque, motivoHora,
 } from './score.js';
 import {
   IMPRESIONES, nuevaSalida, agregarSalida, factorAprendido, fusionar, hsBaseDelDia, leerSalidas, guardarSalidas,
@@ -186,9 +186,10 @@ function mejorOpcion(resultados) {
   }
   if (dia.tipo === 'ninguna') {
     // Sin bloque apto no se "juzga": se describe el mar con la escala de colores y se explica la causa.
-    const color = dia.grado ? COLOR_GRADO[dia.grado] : 'rojo';
-    return el('section', { class: `mejor ${color}` },
-      el('h2', { text: `${SIMBOLO[color]} ${dia.grado ? ETIQUETA_GRADO[dia.grado] : 'Sin bloque apto'}` }),
+    // Con olas bajas pero viento o ráfagas que lo impiden, el titular dice la causa y usa su color.
+    const d = dia.grado ? describirSinBloque(dia.grado, dia.limitante) : { color: 'rojo', titulo: 'Sin bloque apto' };
+    return el('section', { class: `mejor ${d.color}` },
+      el('h2', { text: `${SIMBOLO[d.color]} ${d.titulo}` }),
       el('p', { text: dia.causa ?? 'No hay un bloque de 2 horas o más para remar en mar calmo.' }));
   }
   const mejor = dia.mejor;
@@ -203,8 +204,8 @@ function chipDePlaya(r) {
   if (r.bloque) {
     return el('span', { class: `chip ${r.color}`, text: `${SIMBOLO[r.color]} ${r.bloque.desde}–${r.bloque.hasta} h` });
   }
-  const color = r.grado ? COLOR_GRADO[r.grado] : r.color;
-  return el('span', { class: `chip ${color}`, text: `${SIMBOLO[color]} ${r.grado ? ETIQUETA_GRADO[r.grado] : ETIQUETA[r.color]}` });
+  const d = r.grado ? describirSinBloque(r.grado, r.limitante) : { color: r.color, chip: ETIQUETA[r.color] };
+  return el('span', { class: `chip ${d.color}`, text: `${SIMBOLO[d.color]} ${d.chip}` });
 }
 
 function nivelDePlaya(playa, oleaje) {

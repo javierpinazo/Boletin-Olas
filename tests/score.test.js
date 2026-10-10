@@ -7,7 +7,7 @@ import { parseTsunami } from '../job/parse-tsunami.js';
 import {
   colorAltura, colorPeriodo, colorViento, colorDhn, tramoParaPlaya, nivelEn, estadoDhn,
   evaluarHora, evaluarPlayaDia, mejorPlaya, evaluarTsunami, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, gradoMar, ETIQUETA_GRADO, COLOR_GRADO,
-  esTerral, colorRafaga, factorExposicion, motivoHora,
+  esTerral, colorRafaga, factorExposicion, motivoHora, describirSinBloque,
 } from '../site/js/score.js';
 
 const FX = new URL('./fixtures/', import.meta.url);
@@ -546,4 +546,53 @@ test('config: Yuyos es Los Yuyos de Barranco (Costa Verde)', () => {
   const y = config.playas.find((p) => p.id === 'yuyos');
   assert.ok(Math.abs(y.lat - -12.149) < 0.02 && Math.abs(y.lon - -77.026) < 0.02, `${y.lat}, ${y.lon}`);
   assert.match(tramoParaPlaya(y, aviso39).nombre, /Callao hasta San Juan de Marcona/);
+});
+
+// ---------- Sin bloque apto: no mostrar un "Mar calmo" verde si lo que limita es el viento ----------
+
+const conRafagas = (valores, rafaga) => dia(valores).map((h) => ({ ...h, rafagaKmh: rafaga }));
+
+test('limitante: con olas bajas y ráfagas peligrosas, el factor que limita el día son las ráfagas', () => {
+  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200], [14, 0.5, 9, 8, 200]], 35));
+  assert.equal(r.bloque, null);
+  assert.equal(r.grado, 'calmo');
+  assert.deepEqual(r.limitante, { factor: 'rafagas', color: 'rojo' });
+});
+
+test('limitante: elige el factor más repetido del peor color', () => {
+  const horas = [
+    { hora: '2026-10-09T12:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 35 },
+    { hora: '2026-10-09T13:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 15 },
+    { hora: '2026-10-09T14:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 15 },
+  ];
+  assert.equal(evaluar('yuyos', horas).limitante.factor, 'viento', 'viento rojo en 3 horas, ráfagas rojas en 1');
+});
+
+test('limitante: un día verde no tiene limitante', () => {
+  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 5, 200], [13, 0.5, 9, 5, 200]], 10));
+  assert.equal(r.limitante, null);
+});
+
+test('describirSinBloque: olas bajas pero ráfagas -> el titular y el chip dicen la causa, con el color de la causa', () => {
+  const d = describirSinBloque('calmo', { factor: 'rafagas', color: 'rojo' });
+  assert.deepEqual(d, { color: 'rojo', titulo: 'Mar calmo, pero ráfagas peligrosas', chip: 'Ráfagas' });
+  const a = describirSinBloque('algo', { factor: 'viento', color: 'amarillo' });
+  assert.deepEqual(a, { color: 'amarillo', titulo: 'Mar con algo de olas, pero viento fuerte', chip: 'Viento' });
+});
+
+test('describirSinBloque: si el problema es la ola, o no hay limitante, queda la escala del mar', () => {
+  assert.deepEqual(describirSinBloque('movido', { factor: 'altura', color: 'rojo' }), { color: 'naranja', titulo: 'Mar movido', chip: 'Mar movido' });
+  assert.deepEqual(describirSinBloque('agitado', null), { color: 'rojo', titulo: 'Mar muy agitado', chip: 'Mar muy agitado' });
+  assert.deepEqual(describirSinBloque('calmo', null), { color: 'verde', titulo: 'Mar calmo', chip: 'Mar calmo' });
+});
+
+test('describirSinBloque: con ola movida y otra causa más grave, la ola manda en el titular (naranja/rojo de la escala)', () => {
+  assert.equal(describirSinBloque('movido', { factor: 'rafagas', color: 'rojo' }).titulo, 'Mar movido');
+});
+
+test('estadoDia ninguna: lleva el limitante de la playa representante', () => {
+  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200]], 35));
+  const e = estadoDia([r]);
+  assert.equal(e.tipo, 'ninguna');
+  assert.deepEqual(e.limitante, { factor: 'rafagas', color: 'rojo' });
 });

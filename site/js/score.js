@@ -303,7 +303,19 @@ export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn
       : `Olas de ${f1(hsMedia)} m en tu zona (modelo: ${f1(modeloMedia)} m); para mar calmo conviene menos de ${f1(u.altura.verde)} m`;
   } else causa = motivo;
 
-  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa, factorOla };
+  // Qué limita el día: el factor del peor color que más veces aparece entre las horas. Sirve para no decir
+  // "Mar calmo" en verde cuando lo que impide remar es el viento o las ráfagas.
+  const peorColor = horas.reduce((c, h) => peor(c, h.color), VERDE);
+  const cuenta = new Map();
+  if (peorColor !== VERDE) {
+    for (const h of horas) {
+      for (const r of h.razones) if (r.color === peorColor) cuenta.set(r.factor, (cuenta.get(r.factor) ?? 0) + 1);
+    }
+  }
+  const [factorLimitante] = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
+  const limitante = factorLimitante ? { factor: factorLimitante, color: peorColor } : null;
+
+  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa, factorOla, limitante };
 }
 
 // Playa para la que Open-Meteo no respondió: sin semáforo.
@@ -326,7 +338,12 @@ export function estadoDia(resultados) {
   const representante = conMar
     .filter((r) => r.grado)
     .sort((a, b) => ORDEN_GRADO.indexOf(a.grado) - ORDEN_GRADO.indexOf(b.grado) || (a.hsMedia ?? Infinity) - (b.hsMedia ?? Infinity))[0];
-  return { tipo: 'ninguna', grado: representante?.grado ?? null, causa: representante?.causa ?? null };
+  return {
+    tipo: 'ninguna',
+    grado: representante?.grado ?? null,
+    causa: representante?.causa ?? null,
+    limitante: representante?.limitante ?? null,
+  };
 }
 
 // Alerta de oleaje del DHN (fuerte / muy fuerte) en alguna hora evaluada de alguna playa.
@@ -423,4 +440,28 @@ export function resumenOleajeDia({ aviso, playas, fecha, ventana }) {
     grupos.get(clave).playas.push(playa.nombre);
   }
   return { grupos: [...grupos.values()] };
+}
+
+// Titular y chip cuando no hay un bloque apto. Con olas bajas ("calmo" / "algo") pero un factor de viento
+// que lo impide, se dice la causa y se usa SU color: nunca un "Mar calmo" en verde si no se puede remar.
+// Si el problema es la ola (movido / agitado), manda la escala del mar.
+const LIMITANTE_TITULO = {
+  rafagas: 'ráfagas peligrosas', viento: 'viento fuerte', periodo: 'periodo largo', dhn: 'aviso del DHN',
+  tsunami: 'alerta de tsunami', oleaje: 'faltan datos del mar',
+};
+const LIMITANTE_CHIP = {
+  rafagas: 'Ráfagas', viento: 'Viento', periodo: 'Periodo largo', dhn: 'Aviso DHN',
+  tsunami: 'Tsunami', oleaje: 'Sin datos',
+};
+
+export function describirSinBloque(grado, limitante) {
+  const olasBajas = grado === 'calmo' || grado === 'algo';
+  if (olasBajas && limitante && LIMITANTE_TITULO[limitante.factor]) {
+    return {
+      color: limitante.color,
+      titulo: `${ETIQUETA_GRADO[grado]}, pero ${LIMITANTE_TITULO[limitante.factor]}`,
+      chip: LIMITANTE_CHIP[limitante.factor],
+    };
+  }
+  return { color: COLOR_GRADO[grado], titulo: ETIQUETA_GRADO[grado], chip: ETIQUETA_GRADO[grado] };
 }
