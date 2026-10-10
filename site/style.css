@@ -105,3 +105,17 @@ footer p { margin: 6px 0; }
 .nivel.rojo { color: var(--rojo); }
 .nivel.gris { color: var(--suave); }
 .nota.gris { color: var(--suave); }
+
+.mareas { font-size: .85rem; margin: 0 0 8px; }
+.registro { border-top: 1px solid var(--borde); padding: 10px 0 14px; }
+.registro p { margin: 0 0 8px; font-size: .9rem; }
+.registro button, .salidas button, .salidas .boton {
+  display: inline-block; margin: 0 6px 6px 0; padding: 8px 12px; border-radius: 999px;
+  border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); font: inherit; font-size: .85rem; cursor: pointer;
+}
+.registro button[aria-pressed="true"] { background: var(--acento); color: #fff; border-color: var(--acento); }
+.registro button:focus-visible, .salidas button:focus-visible, .salidas .boton:focus-within { outline: 3px solid var(--acento); outline-offset: 2px; }
+.salidas { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 16px; }
+.salidas h2 { margin: 0 0 4px; font-size: .8rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.salidas p { margin: 4px 0; }
+.oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

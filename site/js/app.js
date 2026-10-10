@@ -1,8 +1,11 @@
-import { cargarMar, horasDelDia, ahoraLima } from './mar.js';
+import { cargarMar, horasDelDia, ahoraLima, mareasDelDia } from './mar.js';
 import {
   evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, ETIQUETA_NIVEL,
-  ETIQUETA_GRADO, COLOR_GRADO,
+  ETIQUETA_GRADO, COLOR_GRADO, motivoHora,
 } from './score.js';
+import {
+  IMPRESIONES, nuevaSalida, agregarSalida, factorAprendido, fusionar, hsBaseDelDia, leerSalidas, guardarSalidas,
+} from './salidas.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -22,9 +25,19 @@ function el(tag, props = {}, ...hijos) {
 }
 
 const num1 = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
+const coma = (n) => String(n).replace('.', ',');
 const fmt = (ms, opts) => new Intl.DateTimeFormat('es-PE', { timeZone: ZONA, ...opts }).format(ms);
 const fechaCorta = (ms) => fmt(ms, { weekday: 'short', day: 'numeric', month: 'short' });
 const horaCorta = (ms) => fmt(ms, { hour: '2-digit', minute: '2-digit', hour12: false });
+
+// localStorage puede no existir o lanzar al tocarlo (modo privado, sitio bloqueado).
+function almacen() {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
+}
 
 async function cargarJson(url) {
   const r = await fetch(url, { cache: 'no-store' });
@@ -32,7 +45,10 @@ async function cargarJson(url) {
   return r.json();
 }
 
-const estado = { dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0 };
+const estado = {
+  dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0, diaCargado: null,
+  salidas: [], abiertas: new Set(), mensajeSalidas: '',
+};
 
 async function iniciar() {
   const raiz = document.getElementById('app');
@@ -41,8 +57,10 @@ async function iniciar() {
   estado.dhn = await cargarJson('./data/dhn.json').catch(() => null);
   const resultados = await Promise.allSettled(estado.config.playas.map((p) => cargarMar(p)));
   estado.mar = resultados.map((r) => (r.status === 'fulfilled' ? r.value : null));
+  estado.salidas = leerSalidas(almacen());
   estado.ahoraMs = Date.now();
   estado.marMs = estado.ahoraMs;
+  estado.diaCargado = ahoraLima(estado.ahoraMs).slice(0, 10);
   pintar();
 }
 
@@ -58,17 +76,21 @@ function evaluarTodo() {
   const tsun = evaluarTsunami(dhn?.tsunami, ahoraMs);
   const fecha = fechaDelDia(estado.dia);
   const resultados = config.playas.map((playa, i) => {
+    // Con 3 o más salidas registradas en esta playa, su factor de ola aprendido reemplaza al del config.
+    const aprendido = factorAprendido(estado.salidas, playa.id);
     const horas = estado.mar[i];
-    if (!horas) return resultadoSinMar(playa);
-    return evaluarPlayaDia({
-      playa,
-      horasCrudas: horasDelDia(horas, fecha, config.ventana, ahoraMs),
-      aviso: dhn?.aviso ?? null,
-      dhn,
-      ahoraMs,
-      config,
-      tsunamiAlerta: tsun.estado === 'alerta',
-    });
+    const base = horas
+      ? evaluarPlayaDia({
+        playa: aprendido ? { ...playa, factorOla: aprendido.factor } : playa,
+        horasCrudas: horasDelDia(horas, fecha, config.ventana, ahoraMs),
+        aviso: dhn?.aviso ?? null,
+        dhn,
+        ahoraMs,
+        config,
+        tsunamiAlerta: tsun.estado === 'alerta',
+      })
+      : resultadoSinMar(playa);
+    return { ...base, playa, indice: i, aprendido, mareas: horas ? mareasDelDia(horas, fecha) : [] };
   });
   const oleaje = resumenOleajeDia({
     aviso: dhn?.aviso ?? null, playas: config.playas, fecha, ventana: config.ventana,
@@ -106,6 +128,7 @@ function pintar() {
     bloqueOleaje(oleaje),
     mejorOpcion(resultados),
     ...resultados.map((r) => tarjeta(r, oleaje)),
+    panelSalidas(),
     pie(tsun),
   ];
   raiz.replaceChildren(...piezas.filter(Boolean));
@@ -191,6 +214,54 @@ function nivelDePlaya(playa, oleaje) {
   return el('small', { class: `nivel ${colorNivel(grupo.nivelMax)}`, text: `Oleaje ${etiqueta.toLowerCase()}` });
 }
 
+function notaFactor(r) {
+  const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id).length;
+  if (r.aprendido) {
+    return `Ola en tu zona = ola del modelo × ${coma(r.aprendido.factor)}, aprendido de tus ${r.aprendido.n} salidas (el config dice ${coma(r.playa.factorOla ?? 1)}).`;
+  }
+  return `Ola en tu zona = ola del modelo × ${coma(r.playa.factorOla ?? 1)} (del config). Registra cómo estaba el mar en 3 salidas para calibrarlo: llevas ${salidasPlaya}.`;
+}
+
+function notaExposicion(r) {
+  const exposiciones = r.horas.map((h) => h.dato.exposicion).filter(Boolean);
+  if (!exposiciones.length) return null;
+  const minima = Math.min(...exposiciones);
+  return el('p', { class: 'nota gris', text: `La ola llega de costado o de espaldas a esta playa: cuenta como ${Math.round(minima * 100)} % de la del modelo (además del factor).` });
+}
+
+function lineaMareas(r) {
+  if (!r.mareas.length) return null;
+  const texto = r.mareas
+    .map((m) => `${m.tipo === 'pleamar' ? 'Pleamar' : 'Bajamar'} ${m.hora} h (${num1(m.nivel)} m)`)
+    .join(' · ');
+  return el('p', { class: 'mareas gris', text: `Mareas: ${texto}` });
+}
+
+function registrar(playa, indice, impresion) {
+  const fecha = fechaDelDia(0);
+  const { config } = estado;
+  const hsBase = hsBaseDelDia(estado.mar[indice] ?? [], fecha, config.ventana, playa.orientacion, config.umbrales);
+  estado.salidas = agregarSalida(estado.salidas, nuevaSalida({ playaId: playa.id, fecha, impresion, hsBase }));
+  estado.mensajeSalidas = guardarSalidas(almacen(), estado.salidas)
+    ? ''
+    : 'No pude guardar en este navegador (¿modo privado?). Exporta tus salidas para no perderlas.';
+  estado.abiertas.add(playa.id);
+  pintar();
+}
+
+function bloqueRegistro(r) {
+  if (estado.dia !== 0) return null;
+  const hoy = fechaDelDia(0);
+  const ya = estado.salidas.find((s) => s.playaId === r.playa.id && s.fecha === hoy);
+  return el('div', { class: 'registro' },
+    el('p', { text: ya ? `Registrado hoy: ${IMPRESIONES[ya.impresion].etiqueta}. Puedes cambiarlo:` : '¿Cómo estaba el mar hoy en tu zona de remo?' }),
+    Object.entries(IMPRESIONES).map(([clave, { etiqueta }]) => {
+      const b = el('button', { type: 'button', text: etiqueta, 'aria-pressed': String(ya?.impresion === clave) });
+      b.addEventListener('click', () => registrar(r.playa, r.indice, clave));
+      return b;
+    }));
+}
+
 function tarjeta(r, oleaje) {
   if (r.estado === 'sin-mar') {
     return el('article', { class: 'playa sin-datos' }, el('h3', { text: r.playa.nombre }), el('p', { text: 'No pude obtener el mar ahora. Reintenta más tarde.' }));
@@ -203,18 +274,60 @@ function tarjeta(r, oleaje) {
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
     el('td', {},
       h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m`,
-      h.dato.hsModelo ? el('small', { class: 'gris', text: ` (modelo ${num1(h.dato.hsModelo)} m)` }) : null),
+      h.dato.hsModelo ? el('small', { class: 'gris', text: ` (modelo ${num1(h.dato.hsModelo)})` }) : null),
     el('td', { text: h.dato.tp === null ? '—' : `${num1(h.dato.tp)} s` }),
-    el('td', { text: h.dato.vientoKmh === null ? '—' : `${Math.round(h.dato.vientoKmh)} km/h` }),
-    el('td', { text: `${SIMBOLO[h.color]} ${ETIQUETA[h.color]}` })));
-  return el('article', { class: 'playa' },
-    el('details', {}, resumen,
-      el('p', { class: 'motivo', text: r.motivo }),
-      r.factorOla !== 1
-        ? el('p', { class: 'nota gris', text: `Ola en tu zona = ola del modelo × ${String(r.factorOla).replace('.', ',')} (ajustable en config.json).` })
-        : null,
-      ...r.notas.map((n) => el('p', { class: 'nota', text: n })),
-      r.horas.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Hora', 'Ola', 'Periodo', 'Viento', 'Estado'].map((t) => el('th', { text: t })))), el('tbody', {}, filas)) : null));
+    el('td', {},
+      h.dato.vientoKmh === null ? '—' : `${Math.round(h.dato.vientoKmh)} km/h`,
+      typeof h.dato.rafagaKmh === 'number' ? el('small', { class: 'gris', text: ` ráf. ${Math.round(h.dato.rafagaKmh)}` }) : null),
+    el('td', { text: `${SIMBOLO[h.color]} ${motivoHora(h) || 'Verde'}` })));
+  const detalles = el('details', estado.abiertas.has(r.playa.id) ? { open: '' } : {}, resumen,
+    el('p', { class: 'motivo', text: r.motivo }),
+    el('p', { class: 'nota gris', text: notaFactor(r) }),
+    notaExposicion(r),
+    ...r.notas.map((n) => el('p', { class: 'nota', text: n })),
+    lineaMareas(r),
+    r.horas.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Hora', 'Ola', 'Periodo', 'Viento', 'Estado / motivo'].map((t) => el('th', { text: t })))), el('tbody', {}, filas)) : null,
+    bloqueRegistro(r));
+  detalles.addEventListener('toggle', () => {
+    if (detalles.open) estado.abiertas.add(r.playa.id);
+    else estado.abiertas.delete(r.playa.id);
+  });
+  return el('article', { class: 'playa' }, detalles);
+}
+
+function exportarSalidas() {
+  const blob = new Blob([JSON.stringify(estado.salidas, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = el('a', { href: url, download: `salidas-boletin-olas-${fechaDelDia(0)}.json` });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function importarSalidas(archivo) {
+  try {
+    const antes = estado.salidas.length;
+    estado.salidas = fusionar(estado.salidas, JSON.parse(await archivo.text()));
+    const guardado = guardarSalidas(almacen(), estado.salidas);
+    estado.mensajeSalidas = `Importadas. Ahora tienes ${estado.salidas.length} salidas (${estado.salidas.length - antes} nuevas).${guardado ? '' : ' No pude guardarlas en este navegador.'}`;
+  } catch (e) {
+    estado.mensajeSalidas = `No pude importar el archivo: ${e.message}`;
+  }
+  pintar();
+}
+
+function panelSalidas() {
+  const exportar = el('button', { type: 'button', text: 'Exportar' });
+  exportar.addEventListener('click', exportarSalidas);
+  const entrada = el('input', { type: 'file', accept: 'application/json,.json', class: 'oculto' });
+  entrada.addEventListener('change', () => { if (entrada.files[0]) importarSalidas(entrada.files[0]); });
+  const importar = el('label', { class: 'boton' }, 'Importar', entrada);
+  return el('section', { class: 'salidas' },
+    el('h2', { text: 'Tus salidas' }),
+    el('p', { class: 'gris', text: `${estado.salidas.length} registradas en este navegador. Exporta de vez en cuando: si borras los datos del sitio se pierden.` }),
+    el('p', {}, exportar, importar),
+    estado.mensajeSalidas ? el('p', { class: 'nota', role: 'status', text: estado.mensajeSalidas }) : null);
 }
 
 function pie(tsun) {
@@ -229,7 +342,7 @@ function pie(tsun) {
     lineas.push(el('p', { class: 'gris', text: `Sismo ${b.magnitud ?? '?'} Mw ${b.lugar ?? ''}: sin tsunami en el litoral peruano (boletín ${b.numero}).` }));
   }
   lineas.push(el('p', { class: 'gris', text: `Datos del DHN leídos: ${dhn ? `${fechaCorta(Date.parse(dhn.generadoEn))} ${horaCorta(Date.parse(dhn.generadoEn))}` : 'no disponible'} · Mar consultado: ${horaCorta(marMs)}` }));
-  lineas.push(el('p', { class: 'gris', text: 'Los datos de oleaje son de modelo (Open-Meteo), no medidos en la orilla; San Bartolo, Punta Hermosa y Yuyos pueden compartir la misma celda. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
+  lineas.push(el('p', { class: 'gris', text: 'Oleaje, viento, ráfagas y mareas son de modelo (Open-Meteo), no medidos en la orilla; varias playas pueden compartir la misma celda del modelo. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
   lineas.push(el('p', { class: 'gris' },
     el('a', { href: 'https://www.dhn.mil.pe/portal/', text: 'dhn.mil.pe', rel: 'noopener' }), ' · ',
     el('a', { href: 'https://www.dhn.mil.pe/portal/boletin-diario-condiciones-oceanograficas', text: 'Boletín oceanográfico diario', rel: 'noopener' }), ' · ',
@@ -237,6 +350,16 @@ function pie(tsun) {
   return el('footer', {}, lineas);
 }
 
-iniciar().catch((e) => {
+function mostrarError(e) {
   document.getElementById('app').replaceChildren(el('section', { class: 'banner rojo', role: 'alert' }, el('strong', { text: 'No pude iniciar la página.' }), el('p', { text: String(e.message) })));
-});
+}
+
+iniciar().catch(mostrarError);
+
+// Si la pestaña queda abierta de un día para otro, "Hoy" se recarga solo con los datos del nuevo día.
+setInterval(() => {
+  if (estado.diaCargado && ahoraLima(Date.now()).slice(0, 10) !== estado.diaCargado) {
+    estado.dia = 0;
+    iniciar().catch(mostrarError);
+  }
+}, 60_000);
