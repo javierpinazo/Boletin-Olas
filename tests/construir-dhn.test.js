@@ -109,3 +109,29 @@ test('construirDhn: un tramo con límite que no conocemos se trata como aviso no
   assert.match(d.avisoCrudo.motivo, /atlantis/i);
   assert.equal(d.aviso, previo.aviso, 'conserva el último aviso entendido');
 });
+
+test('construirDhn: elige el aviso de mayor número aunque se escriba "40 - 26" y el otro "39-26"', () => {
+  const base = leer('avisos-oleaje.html');
+  const html40 = base.replace(/<div class="position-relative">/, `<div class="position-relative">`);
+  // Se renombra el aviso 39 (el primero) a "40 - 26" y se deja el 38 como "38-26".
+  const modificado = html40.replace('NRO. 39-26 (Válido del 08 al 12 de octubre del 2026)', 'NRO. 40 - 26 (Válido del 08 al 12 de octubre 2026)');
+  const d = correr(sinBoletines, null, dia(9));
+  const r = construirDhn({ htmlAvisos: modificado, htmlTsunami: sinBoletines, previo: d, ahora: dia(9) });
+  assert.equal(r.aviso.numero, '40-26');
+});
+
+test('construirDhn: con un aviso y su ACTUALIZACIÓN del mismo número gana el que aparece primero en el listado', () => {
+  const base = leer('avisos-oleaje.html');
+  const partes = base.split('<div class="position-relative">');
+  const nuevo = partes[1].replace('NRO. 39-26 (Válido del 08 al 12 de octubre del 2026)', 'NRO. 39 - 26 (ACTUALIZACIÓN - Válido del 08 al 14 de octubre 2026)');
+  const html = `${partes[0]}<div class="position-relative">${nuevo}<div class="position-relative">${partes[1]}<div class="position-relative">${partes[2]}`;
+  const r = construirDhn({ htmlAvisos: html, htmlTsunami: sinBoletines, previo: correr(sinBoletines, null, dia(9)), ahora: dia(9) });
+  assert.equal(r.aviso.validoHasta, '2026-10-14');
+});
+
+test('validarDhn acepta tramos en nivel normal', () => {
+  const d = correr(sinBoletines, null, dia(9));
+  const copia = structuredClone(d);
+  copia.aviso.tramos[0].linea = [{ nivel: 'normal', desde: '2026-10-07T00:00:00-05:00' }];
+  assert.doesNotThrow(() => validarDhn(copia));
+});

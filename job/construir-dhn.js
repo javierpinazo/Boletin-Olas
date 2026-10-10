@@ -1,15 +1,12 @@
 import { separarItems } from './html.js';
-import { parseAviso, AvisoNoEntendido } from './parse-aviso.js';
+import { parseAviso, AvisoNoEntendido, numeroDeTitulo } from './parse-aviso.js';
 import { parseTsunami, BoletinNoEntendido } from './parse-tsunami.js';
 import { LUGARES } from '../site/js/lugares.js';
 
 const VENTANA_TSUNAMI_MS = 72 * 3600 * 1000;
 const MAX_TSUNAMI = 10;
 
-function numeroAviso(titulo) {
-  const m = titulo.match(/NRO\.\s*(\d+)-(\d+)/i);
-  return m ? Number(m[2]) * 1000 + Number(m[1]) : -1; // año*1000 + número
-}
+const numeroAviso = (titulo) => numeroDeTitulo(titulo)?.orden ?? -1; // año*1000 + número
 
 // htmlAvisos / htmlTsunami: HTML de las páginas del portal. previo: dhn.json anterior o null.
 export function construirDhn({ htmlAvisos, htmlTsunami, previo = null, ahora }) {
@@ -95,7 +92,7 @@ export function validarDhn(d) {
       if (!t.desde || !t.hasta || typeof t.desdeExclusivo !== 'boolean') falla(`tramo ${t.nombre}`);
       if (!Array.isArray(t.linea) || t.linea.length === 0) falla(`linea de ${t.nombre}`);
       for (const p of t.linea) {
-        if (!['ligero', 'moderado', 'fuerte', 'muy fuerte'].includes(p.nivel)) falla(`nivel ${p.nivel}`);
+        if (!['normal', 'ligero', 'moderado', 'fuerte', 'muy fuerte'].includes(p.nivel)) falla(`nivel ${p.nivel}`);
         if (Number.isNaN(Date.parse(p.desde))) falla(`desde ${p.desde}`);
       }
     }

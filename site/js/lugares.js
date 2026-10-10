@@ -5,6 +5,7 @@ export const LUGARES = {
   paita: -5.09,
   salaverry: -8.22,
   chimbote: -9.08,
+  huarmey: -10.07,
   supe: -10.8,
   huacho: -11.11,
   chancay: -11.57,
