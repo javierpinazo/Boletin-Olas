@@ -66,6 +66,11 @@ test('mareasDelDia: sin datos de nivel devuelve lista vacía', () => {
 });
 
 test('cargarMar: si Open-Meteo no responde en el plazo, falla con un mensaje claro', async () => {
-  const colgado = (url, { signal }) => new Promise((_, rechazar) => signal.addEventListener('abort', () => rechazar(signal.reason)));
+  // AbortSignal.timeout no mantiene vivo el bucle de eventos (en Node 22 el runner cancelaba la prueba):
+  // el fetch falso lo sostiene con su propio temporizador hasta que lo aborten.
+  const colgado = (url, { signal }) => new Promise((_, rechazar) => {
+    const sostener = setTimeout(() => {}, 5000);
+    signal.addEventListener('abort', () => { clearTimeout(sostener); rechazar(signal.reason); });
+  });
   await assert.rejects(() => cargarMar({ lat: 0, lon: 0 }, colgado, 30), /no respondió a tiempo/);
 });
