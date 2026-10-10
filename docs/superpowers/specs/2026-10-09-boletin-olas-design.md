@@ -221,3 +221,26 @@ boletin-olas/
 - Las coordenadas de las playas y la asignación exacta de La Punta al tramo "hasta Callao" se confirman
   al implementar.
 - El job puede quedar pausado por inactividad (ver §3).
+
+## 13. Mejoras del 2026-10-10
+
+Aprobadas por el usuario (con decisiones: Yuyos = Los Yuyos de Barranco; registro en el navegador con exportar;
+publicación en GitHub Pages; ráfagas 20 / 30 km/h).
+
+- **Registro de salidas** (`site/js/salidas.js`): una impresión por playa y día (Plano ≈ 0,1 m, Olitas ≈ 0,3 m,
+  Con olas ≈ 0,6 m, No se podía remar ≈ 1 m) junto a la ola base del modelo ese día (media de la ventana, corregida
+  por orientación, sin factor). Con 3 o más salidas el factor de ola de la playa es la mediana de altura percibida /
+  ola base, acotada a [0,05; 1,5], y reemplaza al del config. Se guarda en localStorage (`boletin-olas:salidas:v1`),
+  con exportar / importar JSON; si el almacenamiento falla la página sigue funcionando y lo avisa.
+- **Ráfagas** (`wind_gusts_10m`): factor nuevo del semáforo, verde ≤ 20, amarillo ≤ 30, rojo > 30 km/h. Observado al
+  implementarlo: las ráfagas del modelo son 2–3 veces el viento medio, así que desde media mañana muchas horas pasan
+  a amarillo o rojo por ráfaga.
+- **Orientación de cada playa** (`orientacion`, hacia dónde mira el mar): el terral pasa a ser el viento que sale
+  de tierra (±70° de orientacion + 180) y la ola se corrige por exposición (de frente 1; hasta 90° 0,6; de espaldas
+  0,3). Valores iniciales estimados desde el mapa: San Bartolo 260°, Punta Hermosa 240°, Los Yuyos 225°, La Punta 15°
+  (lado de Cantolao, dentro de la bahía). Con La Punta mirando al norte, el viento del sur cuenta como terral.
+- **Mareas**: pleamares y bajamares del día desde `sea_level_height_msl`; solo informativo.
+- **Motivo por hora** en la tabla, **timeout de 15 s** a Open-Meteo, **recarga** al cambiar de día con la pestaña
+  abierta, frase de tsunami con o sin "el", entidades HTML numéricas y de acentos, workflow con `pull --rebase` y
+  `timeout-minutes`.
+- Avisos anteriores a 2026: fuera de alcance.

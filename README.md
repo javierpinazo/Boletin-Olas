@@ -4,7 +4,18 @@
 
 - **Qué hace:** lee el aviso de oleaje y los boletines de sismo/tsunami del DHN (job diario) y consulta oleaje y viento por playa en Open-Meteo (en vivo, desde el navegador). Muestra un semáforo por playa y por hora (06–17 h).
 - **Diseño:** `docs/superpowers/specs/2026-10-09-boletin-olas-design.md`
-- **Umbrales:** `site/config.json` (se calibran con `npm run valores`).
+- **Umbrales y playas:** `site/config.json` (umbrales del semáforo, ráfagas, coordenadas, orientación de cada playa y factor de ola).
+
+## Calibración con tus salidas
+
+El modelo da la ola de mar abierto; en la zona tranquila donde remas suele ser mucho menor. Cada playa tiene un
+`factorOla` (hoy 0,31) y una `orientacion` (hacia dónde mira el mar, en grados) en el config.
+
+1. Al volver de remar, abre la tarjeta de la playa (pestaña **Hoy**) y marca cómo estaba el mar: Plano, Olitas, Con olas o No se podía remar.
+2. Con 3 o más salidas en una playa, la app calcula su factor (mediana de lo que viste / lo que decía el modelo) y lo usa en lugar del del config. La tarjeta dice cuál está usando.
+3. Las salidas se guardan en el navegador. **Exporta** de vez en cuando (panel "Tus salidas") e **importa** el archivo en otro navegador o celular.
+
+`npm run valores` imprime la ola, el periodo y el viento del modelo por playa para comparar a mano.
 
 ## Comandos
 
