@@ -17,3 +17,11 @@ test('separarItems lee id, título y texto de cada aviso', () => {
   assert.equal(items[0].titulo, 'AVISO ESPECIAL DE OLEAJE NRO. 39-26 (Válido del 08 al 12 de octubre del 2026)');
   assert.match(items[0].texto, /Litoral Norte \(Zona de Tumbes hasta Salaverry\)/);
 });
+
+test('htmlATexto decodifica entidades numéricas y de acentos (&#243;, &#xF3;, &oacute;, &ntilde;)', () => {
+  assert.equal(htmlATexto('Direcci&#243;n, Direcci&#xF3;n, Direcci&oacute;n, Espa&ntilde;a, &Aacute;REA, &uuml;'), 'Dirección, Dirección, Dirección, España, ÁREA, ü');
+});
+
+test('htmlATexto deja intactas las entidades desconocidas', () => {
+  assert.equal(htmlATexto('a &foo; b'), 'a &foo; b');
+});

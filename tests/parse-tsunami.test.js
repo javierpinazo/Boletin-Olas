@@ -35,3 +35,30 @@ test('boletín de alerta real de 2025 (otro formato, sin fecha) cuenta como ries
 test('boletín sin número en el título se rechaza', () => {
   assert.throws(() => parseTsunami({ titulo: 'BOLETÍN RARO', texto: 'x' }), /Sin número/);
 });
+
+const boletin = (titulo, conclusion, hora = '12:56:00') => ({
+  titulo,
+  texto: `El día 09 octubre 2026, a ${hora} hora local (17:56:00 UTC), se ha registrado un evento sísmico localizado 59 KM WSW OF LAS TABLAS, PANAMA, con una magnitud de 7.6 Mw. ${conclusion}`,
+});
+
+test('tsunami: "NO GENERA TSUNAMI EN EL LITORAL PERUANO" (con "el") también es sin riesgo', () => {
+  const b = parseTsunami(boletin('BOLETÍN DE SISMO TSUNAMI N° 30-2026-2', 'Se comunica que este evento NO GENERA TSUNAMI EN EL LITORAL PERUANO.'));
+  assert.equal(b.generaTsunamiEnPeru, false);
+});
+
+test('tsunami: hora local sin segundos ("a 12:56 hora local")', () => {
+  const b = parseTsunami(boletin('BOLETÍN DE SISMO TSUNAMI N° 30-2026-2', 'NO GENERA TSUNAMI EN LITORAL PERUANO.', '12:56'));
+  assert.equal(b.fechaLocal, '2026-10-09T12:56:00-05:00');
+});
+
+test('tsunami: número con "No." o "Nro." en vez de "N°"', () => {
+  for (const pref of ['No.', 'Nro.', 'NRO', 'Nº']) {
+    const b = parseTsunami(boletin(`BOLETÍN DE SISMO TSUNAMI ${pref} 30-2026-2`, 'NO GENERA TSUNAMI EN LITORAL PERUANO.'));
+    assert.equal(b.numero, '30-2026-2', pref);
+  }
+});
+
+test('tsunami: una frase parecida pero distinta sigue siendo alerta', () => {
+  const b = parseTsunami(boletin('BOLETÍN DE SISMO TSUNAMI N° 30-2026-1', 'SE EMITE ALERTA DE TSUNAMI EN EL LITORAL PERUANO.'));
+  assert.equal(b.generaTsunamiEnPeru, true);
+});
