@@ -1,29 +1,35 @@
-// Datos de oleaje y viento por playa desde Open-Meteo (gratuito, sin clave, admite CORS).
+// Datos de oleaje, viento y nivel del mar por playa desde Open-Meteo (gratuito, sin clave, admite CORS).
 
 const MARINO = 'https://marine-api.open-meteo.com/v1/marine';
 const VIENTO = 'https://api.open-meteo.com/v1/forecast';
 const COMUN = 'forecast_days=3&timezone=America%2FLima';
 
+const CAMPOS_MAR = {
+  wave_height: 'hs', wave_period: 'tp', wave_direction: 'dirOla', sea_level_height_msl: 'nivelMar',
+};
+const CAMPOS_VIENTO = { wind_speed_10m: 'vientoKmh', wind_direction_10m: 'dirViento', wind_gusts_10m: 'rafagaKmh' };
+
 export const urlMar = (p) =>
-  `${MARINO}?latitude=${p.lat}&longitude=${p.lon}&hourly=wave_height,wave_period&${COMUN}`;
+  `${MARINO}?latitude=${p.lat}&longitude=${p.lon}&hourly=${Object.keys(CAMPOS_MAR).join(',')}&${COMUN}`;
 export const urlViento = (p) =>
-  `${VIENTO}?latitude=${p.lat}&longitude=${p.lon}&hourly=wind_speed_10m,wind_direction_10m&${COMUN}`;
+  `${VIENTO}?latitude=${p.lat}&longitude=${p.lon}&hourly=${Object.keys(CAMPOS_VIENTO).join(',')}&${COMUN}`;
 
 // Une las dos respuestas por hora ('2026-10-09T07:00', hora de Lima). Devuelve
-// [{hora, hs, tp, vientoKmh, dirViento}], con null donde la fuente no trae dato.
+// [{hora, hs, tp, dirOla, nivelMar, vientoKmh, dirViento, rafagaKmh}], con null donde no hay dato.
 export function combinarHoras(mar, viento) {
   const porHora = new Map();
+  const vacia = (hora) => ({ hora, ...Object.fromEntries([...Object.values(CAMPOS_MAR), ...Object.values(CAMPOS_VIENTO)].map((c) => [c, null])) });
   const tomar = (json, campos) => {
     const h = json?.hourly;
     if (!h || !Array.isArray(h.time)) throw new Error('Respuesta de Open-Meteo sin datos horarios');
     h.time.forEach((hora, i) => {
-      const fila = porHora.get(hora) ?? { hora, hs: null, tp: null, vientoKmh: null, dirViento: null };
+      const fila = porHora.get(hora) ?? vacia(hora);
       for (const [origen, destino] of Object.entries(campos)) fila[destino] = h[origen]?.[i] ?? null;
       porHora.set(hora, fila);
     });
   };
-  tomar(mar, { wave_height: 'hs', wave_period: 'tp' });
-  tomar(viento, { wind_speed_10m: 'vientoKmh', wind_direction_10m: 'dirViento' });
+  tomar(mar, CAMPOS_MAR);
+  tomar(viento, CAMPOS_VIENTO);
   return [...porHora.values()].sort((a, b) => a.hora.localeCompare(b.hora));
 }
 
@@ -42,13 +48,36 @@ export function horasDelDia(horas, fecha, ventana, ahoraMs) {
   });
 }
 
-export async function cargarMar(playa, fetchFn = fetch) {
-  const [mar, viento] = await Promise.all(
-    [urlMar(playa), urlViento(playa)].map(async (url) => {
-      const r = await fetchFn(url);
-      if (!r.ok) throw new Error(`Open-Meteo respondió ${r.status}`);
-      return r.json();
-    }),
-  );
+// Pleamares y bajamares de `fecha` a partir del nivel del mar horario (máximos y mínimos locales).
+// Usa las horas vecinas de los días contiguos para no perder un extremo a las 0 o a las 23 h.
+export function mareasDelDia(horas, fecha) {
+  const serie = horas.filter((h) => h.nivelMar !== null && h.nivelMar !== undefined);
+  const mareas = [];
+  for (let i = 1; i < serie.length - 1; i++) {
+    const { hora, nivelMar: n } = serie[i];
+    if (!hora.startsWith(fecha)) continue;
+    const antes = serie[i - 1].nivelMar;
+    const despues = serie[i + 1].nivelMar;
+    if (n > antes && n >= despues) mareas.push({ tipo: 'pleamar', hora: Number(hora.slice(11, 13)), nivel: n });
+    else if (n < antes && n <= despues) mareas.push({ tipo: 'bajamar', hora: Number(hora.slice(11, 13)), nivel: n });
+  }
+  return mareas;
+}
+
+// Cada consulta tiene un plazo: si Open-Meteo se cuelga, la página no se queda "consultando" para siempre.
+export async function cargarMar(playa, fetchFn = fetch, timeoutMs = 15000) {
+  const pedir = async (url) => {
+    const signal = AbortSignal.timeout(timeoutMs);
+    let r;
+    try {
+      r = await fetchFn(url, { signal });
+    } catch (e) {
+      if (signal.aborted) throw new Error(`Open-Meteo no respondió a tiempo (${timeoutMs / 1000} s)`);
+      throw e;
+    }
+    if (!r.ok) throw new Error(`Open-Meteo respondió ${r.status}`);
+    return r.json();
+  };
+  const [mar, viento] = await Promise.all([pedir(urlMar(playa)), pedir(urlViento(playa))]);
   return combinarHoras(mar, viento);
 }
