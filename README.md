@@ -28,12 +28,15 @@ El modelo da la ola de mar abierto; en la zona tranquila donde remas suele ser m
 | `npm run serve` | Sirve `_site/` en http://localhost:8080 |
 | `npm run valores` | Imprime ola/periodo/viento de hoy por playa, para calibrar |
 
-## Publicación (GitHub Pages)
+## Dónde corre
 
-1. En el repo: **Settings → Pages → Source: GitHub Actions**.
-2. **Actions → Publicar → Run workflow** para la primera corrida (crea `data/dhn.json` y publica).
-3. Después corre solo cada día a las 05:30 (hora de Lima). Para forzar una lectura antes de salir: **Run workflow**.
-4. Si GitHub pausa el cron por inactividad (60 días sin commits), se reactiva con un clic en Actions.
+- **Producción: la VPS, en https://olas.veripago.pe.** n8n lanza cada hora `deploy/vps/actualizar.sh` (lee el DHN y arma
+  el sitio) y nginx sirve la carpeta estática. Instalación, operación y cómo actualizar el código:
+  [`deploy/vps/README.md`](deploy/vps/README.md). Los datos (`data/`) **no se versionan**: viven en cada servidor.
+- **En tu PC:** `npm run hoy`.
+- **GitHub Pages (opcional):** el workflow `Publicar` ya no se programa ni commitea nada; solo corre a mano (**Actions →
+  Publicar → Run workflow**) y requiere **Settings → Pages → Source: GitHub Actions**. No lo actives si no lo necesitas:
+  la página publicada ahí solo se actualizaría cuando lo lances tú.
 
 ## Importante
 

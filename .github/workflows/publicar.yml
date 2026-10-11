@@ -1,15 +1,12 @@
 name: Publicar
 
+# Publicación OPCIONAL en GitHub Pages, solo a mano ("Run workflow"). La app corre en la VPS (olas.veripago.pe, ver
+# deploy/vps/) y allí n8n lee el DHN cada hora; este flujo ya no se programa ni commitea datos al repo.
 on:
-  schedule:
-    - cron: '30 10 * * *' # 10:30 UTC = 05:30 hora de Lima
-  workflow_dispatch: # botón "Run workflow" para correrlo a demanda
-  push:
-    branches: [main]
-    paths: ['site/**', 'scripts/**', '.github/workflows/publicar.yml']
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -34,19 +31,7 @@ jobs:
         run: npm test
 
       - name: Leer el DHN
-        if: github.event_name != 'push'
         run: npm run dhn
-
-      - name: Guardar dhn.json
-        if: github.event_name != 'push'
-        run: |
-          git config user.name "boletin-olas[bot]"
-          git config user.email "actions@users.noreply.github.com"
-          git add data/dhn.json
-          git commit -m "datos: dhn.json $(date -u +%Y-%m-%dT%H:%MZ)" || echo "sin cambios"
-          # Si main avanzó durante la corrida (un push tuyo), se rebasa encima antes de empujar.
-          git pull --rebase origin main
-          git push
 
       - name: Armar el sitio
         run: npm run build
