@@ -508,11 +508,11 @@ test('playa-día: la exposición se suma al factor de ola y queda a la vista', (
 
 // ---------- Ráfagas ----------
 
-test('ráfagas: verde hasta 20, amarillo hasta 30, rojo por encima', () => {
-  assert.equal(colorRafaga(20, u).color, 'verde');
-  assert.equal(colorRafaga(20.5, u).color, 'amarillo');
-  assert.equal(colorRafaga(30, u).color, 'amarillo');
-  assert.equal(colorRafaga(31, u).color, 'rojo');
+test('ráfagas: verde hasta 25, amarillo hasta 40, rojo solo por encima (los modelos discrepan mucho en ráfagas)', () => {
+  assert.equal(colorRafaga(25, u).color, 'verde');
+  assert.equal(colorRafaga(25.5, u).color, 'amarillo');
+  assert.equal(colorRafaga(40, u).color, 'amarillo');
+  assert.equal(colorRafaga(41, u).color, 'rojo');
   assert.match(colorRafaga(33.5, u).texto, /^Ráfagas de 34 km\/h/);
 });
 
@@ -520,7 +520,8 @@ test('ráfagas en la hora: dato faltante da amarillo; si la fuente no las trae (
   const ctx = { umbrales: u, nivelDhn: 'ligero', estado: 'ok', tsunamiAlerta: false };
   const base = { hora: '2026-10-10T07:00', hs: 0.5, tp: 9, vientoKmh: 6, dirViento: 200 };
   assert.equal(evaluarHora({ ...base, rafagaKmh: 15 }, ctx).color, 'verde');
-  assert.equal(evaluarHora({ ...base, rafagaKmh: 35 }, ctx).color, 'rojo');
+  assert.equal(evaluarHora({ ...base, rafagaKmh: 35 }, ctx).color, 'amarillo');
+  assert.equal(evaluarHora({ ...base, rafagaKmh: 45 }, ctx).color, 'rojo');
   assert.equal(evaluarHora({ ...base, rafagaKmh: null }, ctx).color, 'amarillo');
   assert.equal(evaluarHora(base, ctx).color, 'verde');
 });
@@ -533,7 +534,7 @@ test('motivoHora: vacío si es verde; si no, la(s) razón(es) del peor color', (
   assert.equal(motivoHora(evaluarHora(base, ctx)), '');
   assert.equal(motivoHora(evaluarHora({ ...base, vientoKmh: 15 }, ctx)), 'Viento de 15 km/h');
   assert.equal(motivoHora(evaluarHora({ ...base, hs: 1.5, vientoKmh: 15 }, ctx)), 'Olas de 1,5 m, demasiado altas');
-  assert.equal(motivoHora(evaluarHora({ ...base, vientoKmh: 15, rafagaKmh: 25 }, ctx)), 'Viento de 15 km/h · Ráfagas de 25 km/h');
+  assert.equal(motivoHora(evaluarHora({ ...base, vientoKmh: 15, rafagaKmh: 30 }, ctx)), 'Viento de 15 km/h · Ráfagas de 30 km/h');
 });
 
 // ---------- Config: orientación y Yuyos en Barranco ----------
@@ -553,7 +554,7 @@ test('config: Yuyos es Los Yuyos de Barranco (Costa Verde)', () => {
 const conRafagas = (valores, rafaga) => dia(valores).map((h) => ({ ...h, rafagaKmh: rafaga }));
 
 test('limitante: con olas bajas y ráfagas peligrosas, el factor que limita el día son las ráfagas', () => {
-  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200], [14, 0.5, 9, 8, 200]], 35));
+  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200], [14, 0.5, 9, 8, 200]], 45));
   assert.equal(r.bloque, null);
   assert.equal(r.grado, 'calmo');
   assert.deepEqual(r.limitante, { factor: 'rafagas', color: 'rojo' });
@@ -561,7 +562,7 @@ test('limitante: con olas bajas y ráfagas peligrosas, el factor que limita el d
 
 test('limitante: elige el factor más repetido del peor color', () => {
   const horas = [
-    { hora: '2026-10-09T12:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 35 },
+    { hora: '2026-10-09T12:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 45 },
     { hora: '2026-10-09T13:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 15 },
     { hora: '2026-10-09T14:00', hs: 0.5, tp: 9, vientoKmh: 25, dirViento: 200, rafagaKmh: 15 },
   ];
@@ -591,8 +592,20 @@ test('describirSinBloque: con ola movida y otra causa más grave, la ola manda e
 });
 
 test('estadoDia ninguna: lleva el limitante de la playa representante', () => {
-  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200]], 35));
+  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200]], 45));
   const e = estadoDia([r]);
   assert.equal(e.tipo, 'ninguna');
   assert.deepEqual(e.limitante, { factor: 'rafagas', color: 'rojo' });
+});
+
+test('ráfagas de 35 km/h ya no quitan el bloque: queda amarillo (antes era rojo y "Mar calmo, pero ráfagas")', () => {
+  const r = evaluar('yuyos', conRafagas([[12, 0.5, 9, 8, 200], [13, 0.5, 9, 8, 200], [14, 0.5, 9, 8, 200]], 35));
+  assert.notEqual(r.bloque, null);
+  assert.equal(r.color, 'amarillo');
+  assert.deepEqual([r.bloque.desde, r.bloque.hasta], [12, 15]);
+  assert.match(r.motivo, /Ráfagas de 35 km\/h/);
+});
+
+test('config: umbrales de ráfagas 25 / 40', () => {
+  assert.deepEqual(u.rafagas, { verde: 25, amarillo: 40 });
 });

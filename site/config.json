@@ -3,7 +3,7 @@
     "altura": { "verde": 0.8, "amarillo": 1.3, "agitado": 2.0 },
     "periodo": { "calmoHs": 0.6, "verde": 12, "amarillo": 14, "rojoHs": 0.8 },
     "viento": { "verde": 12, "amarillo": 20 },
-    "rafagas": { "verde": 20, "amarillo": 30 },
+    "rafagas": { "verde": 25, "amarillo": 40 },
     "terral": { "dirDesde": 20, "dirHasta": 160, "semiancho": 70, "verde": 8, "amarillo": 15 },
     "exposicionOla": [
       { "hasta": 45, "factor": 1 },
