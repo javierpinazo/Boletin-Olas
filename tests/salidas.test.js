@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   IMPRESIONES, nuevaSalida, agregarSalida, factorAprendido, fusionar, hsBaseDelDia, leerSalidas, guardarSalidas,
+  IMPRESIONES_VIENTO, factorVientoAprendido, vientoBaseDelDia,
 } from '../site/js/salidas.js';
 
 const config = JSON.parse(fs.readFileSync(new URL('../site/config.json', import.meta.url), 'utf8'));
@@ -79,4 +80,87 @@ test('almacenamiento: guarda y lee del navegador; si falla o está corrupto devu
   assert.deepEqual(leerSalidas(bloqueado), []);
   assert.equal(guardarSalidas(bloqueado, []), false);
   assert.deepEqual(leerSalidas(undefined), []);
+});
+
+// ---------- Impresión del viento ----------
+
+const conViento = (fecha, viento, vientoBase, playaId = 'yuyos') => nuevaSalida({ playaId, fecha, viento, vientoBase });
+
+test('viento: cuatro impresiones con los km/h que representan', () => {
+  assert.deepEqual(Object.keys(IMPRESIONES_VIENTO), ['calmo', 'moderado', 'fuerte', 'muyFuerte']);
+  assert.deepEqual(Object.values(IMPRESIONES_VIENTO).map((v) => v.kmh), [5, 15, 25, 35]);
+});
+
+test('nuevaSalida: puede registrar solo el viento, solo las olas o ambos', () => {
+  assert.deepEqual(conViento('2026-10-10', 'moderado', 12), { id: '2026-10-10-yuyos', playaId: 'yuyos', fecha: '2026-10-10', viento: 'moderado', vientoBase: 12 });
+  assert.deepEqual(salida('2026-10-10', 'olitas', 1.6), { id: '2026-10-10-yuyos', playaId: 'yuyos', fecha: '2026-10-10', impresion: 'olitas', hsBase: 1.6 });
+  const ambos = nuevaSalida({ playaId: 'yuyos', fecha: '2026-10-10', impresion: 'olitas', hsBase: 1.6, viento: 'calmo', vientoBase: 12 });
+  assert.equal(ambos.viento, 'calmo');
+  assert.equal(ambos.impresion, 'olitas');
+});
+
+test('nuevaSalida: sin ninguna impresión, o con una de viento desconocida, se rechaza', () => {
+  assert.throws(() => nuevaSalida({ playaId: 'yuyos', fecha: '2026-10-10' }), /Falta la impresión/);
+  assert.throws(() => nuevaSalida({ playaId: 'yuyos', fecha: '2026-10-10', viento: 'huracan', vientoBase: 10 }), /Impresión de viento desconocida/);
+});
+
+test('agregarSalida: el viento y las olas del mismo día y playa se juntan en un solo registro', () => {
+  let lista = agregarSalida([], salida('2026-10-10', 'olitas', 1.6));
+  lista = agregarSalida(lista, conViento('2026-10-10', 'calmo', 12));
+  assert.equal(lista.length, 1);
+  assert.deepEqual(lista[0], { id: '2026-10-10-yuyos', playaId: 'yuyos', fecha: '2026-10-10', impresion: 'olitas', hsBase: 1.6, viento: 'calmo', vientoBase: 12 });
+  lista = agregarSalida(lista, conViento('2026-10-10', 'fuerte', 12));
+  assert.equal(lista[0].viento, 'fuerte', 'cambiar la impresión del día la reemplaza');
+  assert.equal(lista[0].impresion, 'olitas', 'sin tocar la otra');
+});
+
+test('factorVientoAprendido: con menos de 3 salidas con viento no hay factor', () => {
+  assert.equal(factorVientoAprendido([conViento('2026-10-10', 'calmo', 12), conViento('2026-10-11', 'calmo', 12)], 'yuyos'), null);
+});
+
+test('factorVientoAprendido: mediana de km/h percibidos / km/h del modelo, solo de esa playa', () => {
+  const lista = [
+    conViento('2026-10-10', 'calmo', 10), // 0,5
+    conViento('2026-10-11', 'moderado', 15), // 1
+    conViento('2026-10-12', 'calmo', 20), // 0,25
+    conViento('2026-10-12', 'fuerte', 10, 'san-bartolo'),
+    salida('2026-10-13', 'olitas', 1.5), // sin viento: no cuenta
+  ];
+  assert.deepEqual(factorVientoAprendido(lista, 'yuyos'), { factor: 0.5, n: 3 });
+  assert.equal(factorVientoAprendido(lista, 'san-bartolo'), null);
+});
+
+test('factorVientoAprendido: ignora salidas sin viento base y acota el factor a [0,2; 1,5]', () => {
+  const sinBase = [conViento('2026-10-10', 'calmo', 0), conViento('2026-10-11', 'calmo', null), conViento('2026-10-12', 'calmo', 10)];
+  assert.equal(factorVientoAprendido(sinBase, 'yuyos'), null);
+  const bajo = [1, 2, 3].map((d) => conViento(`2026-10-1${d}`, 'calmo', 100));
+  assert.equal(factorVientoAprendido(bajo, 'yuyos').factor, 0.2);
+  const alto = [1, 2, 3].map((d) => conViento(`2026-10-1${d}`, 'muyFuerte', 5));
+  assert.equal(factorVientoAprendido(alto, 'yuyos').factor, 1.5);
+});
+
+test('factorAprendido (olas) no se confunde con registros que solo traen viento', () => {
+  const lista = [conViento('2026-10-10', 'calmo', 10), conViento('2026-10-11', 'calmo', 10), conViento('2026-10-12', 'calmo', 10)];
+  assert.equal(factorAprendido(lista, 'yuyos'), null);
+});
+
+test('vientoBaseDelDia: media del viento medio del modelo en la ventana', () => {
+  const horas = [5, 6, 7, 17].map((h) => ({ hora: `2026-10-10T${String(h).padStart(2, '0')}:00`, vientoKmh: h === 7 ? 20 : 10 }));
+  assert.equal(vientoBaseDelDia(horas, '2026-10-10', config.ventana), 15, 'solo 6 h y 7 h');
+  assert.equal(vientoBaseDelDia([], '2026-10-10', config.ventana), null);
+  assert.equal(vientoBaseDelDia([{ hora: '2026-10-10T08:00', vientoKmh: null }], '2026-10-10', config.ventana), null);
+});
+
+test('fusionar e importar: aceptan registros solo de viento; descartan los que no traen ninguna impresión', () => {
+  const importadas = [conViento('2026-10-11', 'fuerte', 14), { id: 'x', playaId: 'yuyos', fecha: '2026-10-12' }];
+  const r = fusionar([], importadas);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].viento, 'fuerte');
+});
+
+test('almacenamiento: los registros de antes (solo olas) se siguen leyendo; los de solo viento también', () => {
+  const memoria = new Map();
+  const storage = { getItem: (k) => memoria.get(k) ?? null, setItem: (k, v) => memoria.set(k, v) };
+  guardarSalidas(storage, [salida('2026-10-10', 'olitas', 1.6), conViento('2026-10-11', 'calmo', 12)]);
+  assert.equal(leerSalidas(storage).length, 2);
 });
