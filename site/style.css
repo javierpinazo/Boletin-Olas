@@ -119,3 +119,4 @@ footer p { margin: 6px 0; }
 .salidas h2 { margin: 0 0 4px; font-size: .8rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
 .salidas p { margin: 4px 0; }
 .oculto { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.fila-registro { margin-bottom: 4px; }

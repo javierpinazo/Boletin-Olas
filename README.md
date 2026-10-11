@@ -11,8 +11,8 @@
 El modelo da la ola de mar abierto; en la zona tranquila donde remas suele ser mucho menor. Cada playa tiene un
 `factorOla` (hoy 0,31) y una `orientacion` (hacia dónde mira el mar, en grados) en el config.
 
-1. Al volver de remar, abre la tarjeta de la playa (pestaña **Hoy**) y marca cómo estaba el mar: Plano, Olitas, Con olas o No se podía remar.
-2. Con 3 o más salidas en una playa, la app calcula su factor (mediana de lo que viste / lo que decía el modelo) y lo usa en lugar del del config. La tarjeta dice cuál está usando.
+1. Al volver de remar, abre la tarjeta de la playa (pestaña **Hoy**) y marca cómo estaba el mar (Plano, Olitas, Con olas, No se podía remar) **y el viento** (Calmo, Moderado, Fuerte, Muy fuerte).
+2. Con 3 o más salidas en una playa, la app calcula sus factores de ola y de viento (mediana de lo que viste / lo que decía el modelo) y los usa en lugar de los del config. El factor de viento corrige también las ráfagas. La tarjeta dice cuáles está usando y la tabla muestra, en gris, el valor original del modelo.
 3. Las salidas se guardan en el navegador. **Exporta** de vez en cuando (panel "Tus salidas") e **importa** el archivo en otro navegador o celular.
 
 `npm run valores` imprime la ola, el periodo y el viento del modelo por playa para comparar a mano.

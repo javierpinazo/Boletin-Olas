@@ -4,7 +4,8 @@ import {
   describirSinBloque, motivoHora,
 } from './score.js';
 import {
-  IMPRESIONES, nuevaSalida, agregarSalida, factorAprendido, fusionar, hsBaseDelDia, leerSalidas, guardarSalidas,
+  IMPRESIONES, IMPRESIONES_VIENTO, nuevaSalida, agregarSalida, factorAprendido, factorVientoAprendido, fusionar,
+  hsBaseDelDia, vientoBaseDelDia, leerSalidas, guardarSalidas,
 } from './salidas.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
@@ -76,12 +77,17 @@ function evaluarTodo() {
   const tsun = evaluarTsunami(dhn?.tsunami, ahoraMs);
   const fecha = fechaDelDia(estado.dia);
   const resultados = config.playas.map((playa, i) => {
-    // Con 3 o más salidas registradas en esta playa, su factor de ola aprendido reemplaza al del config.
+    // Con 3 o más salidas registradas en esta playa, sus factores de ola y de viento aprendidos reemplazan a los del config.
     const aprendido = factorAprendido(estado.salidas, playa.id);
+    const aprendidoViento = factorVientoAprendido(estado.salidas, playa.id);
     const horas = estado.mar[i];
     const base = horas
       ? evaluarPlayaDia({
-        playa: aprendido ? { ...playa, factorOla: aprendido.factor } : playa,
+        playa: {
+          ...playa,
+          ...(aprendido ? { factorOla: aprendido.factor } : {}),
+          ...(aprendidoViento ? { factorViento: aprendidoViento.factor } : {}),
+        },
         horasCrudas: horasDelDia(horas, fecha, config.ventana, ahoraMs),
         aviso: dhn?.aviso ?? null,
         dhn,
@@ -90,7 +96,7 @@ function evaluarTodo() {
         tsunamiAlerta: tsun.estado === 'alerta',
       })
       : resultadoSinMar(playa);
-    return { ...base, playa, indice: i, aprendido, mareas: horas ? mareasDelDia(horas, fecha) : [] };
+    return { ...base, playa, indice: i, aprendido, aprendidoViento, mareas: horas ? mareasDelDia(horas, fecha) : [] };
   });
   const oleaje = resumenOleajeDia({
     aviso: dhn?.aviso ?? null, playas: config.playas, fecha, ventana: config.ventana,
@@ -216,11 +222,20 @@ function nivelDePlaya(playa, oleaje) {
 }
 
 function notaFactor(r) {
-  const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id).length;
+  const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id && s.impresion).length;
   if (r.aprendido) {
     return `Ola en tu zona = ola del modelo × ${coma(r.aprendido.factor)}, aprendido de tus ${r.aprendido.n} salidas (el config dice ${coma(r.playa.factorOla ?? 1)}).`;
   }
   return `Ola en tu zona = ola del modelo × ${coma(r.playa.factorOla ?? 1)} (del config). Registra cómo estaba el mar en 3 salidas para calibrarlo: llevas ${salidasPlaya}.`;
+}
+
+function notaViento(r) {
+  const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id && s.viento).length;
+  if (r.aprendidoViento) {
+    return `Viento en tu zona = viento del modelo × ${coma(r.aprendidoViento.factor)}, aprendido de tus ${r.aprendidoViento.n} salidas (el config dice ${coma(r.playa.factorViento ?? 1)}). Las ráfagas se corrigen igual.`;
+  }
+  if ((r.playa.factorViento ?? 1) !== 1) return `Viento en tu zona = viento del modelo × ${coma(r.playa.factorViento)} (del config).`;
+  return `El viento y las ráfagas son del modelo, de una celda a varios km. Registra cómo estaba el viento en 3 salidas para corregirlos: llevas ${salidasPlaya}.`;
 }
 
 function notaExposicion(r) {
@@ -238,11 +253,15 @@ function lineaMareas(r) {
   return el('p', { class: 'mareas gris', text: `Mareas: ${texto}` });
 }
 
-function registrar(playa, indice, impresion) {
+// campo: 'olas' | 'viento'. Cada uno se guarda junto a lo que decía el modelo ese día (lo que se quiere aprender).
+function registrar(playa, indice, campo, valor) {
   const fecha = fechaDelDia(0);
   const { config } = estado;
-  const hsBase = hsBaseDelDia(estado.mar[indice] ?? [], fecha, config.ventana, playa.orientacion, config.umbrales);
-  estado.salidas = agregarSalida(estado.salidas, nuevaSalida({ playaId: playa.id, fecha, impresion, hsBase }));
+  const horas = estado.mar[indice] ?? [];
+  const cambios = campo === 'olas'
+    ? { impresion: valor, hsBase: hsBaseDelDia(horas, fecha, config.ventana, playa.orientacion, config.umbrales) }
+    : { viento: valor, vientoBase: vientoBaseDelDia(horas, fecha, config.ventana) };
+  estado.salidas = agregarSalida(estado.salidas, nuevaSalida({ playaId: playa.id, fecha, ...cambios }));
   estado.mensajeSalidas = guardarSalidas(almacen(), estado.salidas)
     ? ''
     : 'No pude guardar en este navegador (¿modo privado?). Exporta tus salidas para no perderlas.';
@@ -250,17 +269,24 @@ function registrar(playa, indice, impresion) {
   pintar();
 }
 
+function filaRegistro(r, ya, campo, titulo, opciones, actual) {
+  const botones = Object.entries(opciones).map(([clave, { etiqueta }]) => {
+    const b = el('button', { type: 'button', text: etiqueta, 'aria-pressed': String(actual === clave) });
+    b.addEventListener('click', () => registrar(r.playa, r.indice, campo, clave));
+    return b;
+  });
+  return el('div', { class: 'fila-registro' },
+    el('p', { text: actual ? `${titulo}: ${opciones[actual].etiqueta}. Puedes cambiarlo:` : titulo }),
+    botones);
+}
+
 function bloqueRegistro(r) {
   if (estado.dia !== 0) return null;
   const hoy = fechaDelDia(0);
   const ya = estado.salidas.find((s) => s.playaId === r.playa.id && s.fecha === hoy);
   return el('div', { class: 'registro' },
-    el('p', { text: ya ? `Registrado hoy: ${IMPRESIONES[ya.impresion].etiqueta}. Puedes cambiarlo:` : '¿Cómo estaba el mar hoy en tu zona de remo?' }),
-    Object.entries(IMPRESIONES).map(([clave, { etiqueta }]) => {
-      const b = el('button', { type: 'button', text: etiqueta, 'aria-pressed': String(ya?.impresion === clave) });
-      b.addEventListener('click', () => registrar(r.playa, r.indice, clave));
-      return b;
-    }));
+    filaRegistro(r, ya, 'olas', '¿Cómo estaba el mar hoy en tu zona de remo?', IMPRESIONES, ya?.impresion),
+    filaRegistro(r, ya, 'viento', '¿Y el viento?', IMPRESIONES_VIENTO, ya?.viento));
 }
 
 function tarjeta(r, oleaje) {
@@ -279,11 +305,13 @@ function tarjeta(r, oleaje) {
     el('td', { text: h.dato.tp === null ? '—' : `${num1(h.dato.tp)} s` }),
     el('td', {},
       h.dato.vientoKmh === null ? '—' : `${Math.round(h.dato.vientoKmh)} km/h`,
-      typeof h.dato.rafagaKmh === 'number' ? el('small', { class: 'gris', text: ` ráf. ${Math.round(h.dato.rafagaKmh)}` }) : null),
+      h.dato.vientoModelo !== undefined ? el('small', { class: 'gris', text: ` (modelo ${Math.round(h.dato.vientoModelo)})` }) : null,
+      typeof h.dato.rafagaKmh === 'number' ? el('small', { class: 'gris', text: ` ráf. ${Math.round(h.dato.rafagaKmh)}${h.dato.rafagaModelo !== undefined ? ` (${Math.round(h.dato.rafagaModelo)})` : ''}` }) : null),
     el('td', { text: `${SIMBOLO[h.color]} ${motivoHora(h) || 'Verde'}` })));
   const detalles = el('details', estado.abiertas.has(r.playa.id) ? { open: '' } : {}, resumen,
     el('p', { class: 'motivo', text: r.motivo }),
     el('p', { class: 'nota gris', text: notaFactor(r) }),
+    el('p', { class: 'nota gris', text: notaViento(r) }),
     notaExposicion(r),
     ...r.notas.map((n) => el('p', { class: 'nota', text: n })),
     lineaMareas(r),

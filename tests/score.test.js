@@ -609,3 +609,61 @@ test('ráfagas de 35 km/h ya no quitan el bloque: queda amarillo (antes era rojo
 test('config: umbrales de ráfagas 25 / 40', () => {
   assert.deepEqual(u.rafagas, { verde: 25, amarillo: 40 });
 });
+
+// ---------- Factor de viento por playa (el modelo da el viento de una celda a varios km) ----------
+
+const conFV = (id, factorViento) => ({ ...playa(id), factorViento });
+const evaluarFV = (p, horas) => evaluarPlayaDia({ playa: p, horasCrudas: horas, aviso: aviso39, dhn, ahoraMs, config });
+const horasViento = (viento, rafaga) => dia([12, 13, 14].map((h) => [h, 0.5, 9, viento, 200])).map((h) => ({ ...h, rafagaKmh: rafaga }));
+
+test('factorViento: viento y ráfagas del modelo se multiplican y el original queda a la vista', () => {
+  const r = evaluarFV(conFV('yuyos', 0.4), horasViento(15, 35));
+  assert.equal(r.horas[0].dato.vientoKmh, 6);
+  assert.equal(r.horas[0].dato.rafagaKmh, 14);
+  assert.equal(r.horas[0].dato.vientoModelo, 15);
+  assert.equal(r.horas[0].dato.rafagaModelo, 35);
+  assert.equal(r.factorViento, 0.4);
+  assert.equal(r.color, 'verde');
+});
+
+test('factorViento: sin factor vale 1 y no marca valores del modelo aparte', () => {
+  const r = evaluarFV(playa('yuyos'), horasViento(15, 35));
+  assert.equal(r.horas[0].dato.vientoKmh, 15);
+  assert.equal(r.horas[0].dato.vientoModelo, undefined);
+  assert.equal(r.factorViento, 1);
+});
+
+test('factorViento: la corrección va antes de los umbrales (30 km/h del modelo con 0,3 = 9 km/h)', () => {
+  const horas = horasViento(30, 30);
+  assert.equal(evaluarFV(playa('yuyos'), horas).horas[0].color, 'rojo', 'sin factor: viento de 30 km/h');
+  assert.equal(evaluarFV(conFV('yuyos', 0.3), horas).horas[0].color, 'verde', 'con factor: 9 km/h y ráfagas de 9');
+});
+
+test('factorViento: un dato faltante sigue faltando (no se inventa 0 ni verde)', () => {
+  const horas = dia([[12, 0.5, 9, null, 200], [13, 0.5, 9, null, 200]]).map((h) => ({ ...h, rafagaKmh: null }));
+  const r = evaluarFV(conFV('yuyos', 0.3), horas);
+  assert.equal(r.horas[0].dato.vientoKmh, null);
+  assert.equal(r.horas[0].dato.rafagaKmh, null);
+  assert.equal(r.horas[0].color, 'amarillo');
+});
+
+test('factorViento: sin campo de ráfagas en la fuente, no se inventa uno', () => {
+  const r = evaluarFV(conFV('yuyos', 0.5), dia([[12, 0.5, 9, 20, 200], [13, 0.5, 9, 20, 200]]));
+  assert.equal(r.horas[0].dato.vientoKmh, 10);
+  assert.equal('rafagaKmh' in r.horas[0].dato, false);
+});
+
+test('factorViento y factorOla se aplican a la vez sin pisarse', () => {
+  const r = evaluarFV({ ...playa('yuyos'), factorOla: 0.5, factorViento: 0.5 }, horasViento(20, 40).map((h) => ({ ...h, hs: 1.6 })));
+  assert.equal(r.horas[0].dato.hs, 0.8);
+  assert.equal(r.horas[0].dato.vientoKmh, 10);
+  assert.equal(r.horas[0].dato.rafagaKmh, 20);
+  assert.equal(r.horas[0].dato.hsModelo, 1.6);
+  assert.equal(r.horas[0].dato.vientoModelo, 20);
+});
+
+test('config: factorViento es opcional pero, si está, razonable (0 < f <= 1,5)', () => {
+  for (const p of config.playas) {
+    assert.ok(p.factorViento === undefined || (typeof p.factorViento === 'number' && p.factorViento > 0 && p.factorViento <= 1.5), p.nombre);
+  }
+});

@@ -220,6 +220,24 @@ function corregirOla(dato, factorOla, orientacion, u) {
   };
 }
 
+// El modelo da el viento y las ráfagas de una celda de varios km (a menudo tierra adentro); en la playa suelen
+// ser menores. `playa.factorViento` (config.json o aprendido de tus salidas; 1 si falta) los corrige.
+// El valor original queda en vientoModelo / rafagaModelo. Un dato faltante sigue faltando.
+function corregirViento(dato, factor) {
+  if (factor === 1) return dato;
+  const escala = (v) => (sinDato(v) ? v : Math.round(v * factor * 10) / 10);
+  const corregido = { ...dato };
+  if (!sinDato(dato.vientoKmh)) {
+    corregido.vientoModelo = dato.vientoKmh;
+    corregido.vientoKmh = escala(dato.vientoKmh);
+  }
+  if ('rafagaKmh' in dato && !sinDato(dato.rafagaKmh)) {
+    corregido.rafagaModelo = dato.rafagaKmh;
+    corregido.rafagaKmh = escala(dato.rafagaKmh);
+  }
+  return corregido;
+}
+
 // Texto de por qué una hora no es verde: la(s) razón(es) de su peor color.
 export function motivoHora(hora) {
   if (hora.color === VERDE) return '';
@@ -229,7 +247,8 @@ export function motivoHora(hora) {
 export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn, ahoraMs, config, tsunamiAlerta = false }) {
   const u = config.umbrales;
   const factorOla = playa.factorOla ?? 1;
-  const horasCrudas = horasDelModelo.map((dato) => corregirOla(dato, factorOla, playa.orientacion, u));
+  const factorViento = playa.factorViento ?? 1;
+  const horasCrudas = horasDelModelo.map((dato) => corregirViento(corregirOla(dato, factorOla, playa.orientacion, u), factorViento));
   const estDhn = estadoDhn(dhn, ahoraMs, u);
   const tramo = aviso ? tramoParaPlaya(playa, aviso) : null;
   const notas = [];
@@ -315,7 +334,7 @@ export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn
   const [factorLimitante] = [...cuenta.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
   const limitante = factorLimitante ? { factor: factorLimitante, color: peorColor } : null;
 
-  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa, factorOla, limitante };
+  return { playa, horas, bloque, color, estado, motivo, notas, tramo: tramo?.nombre ?? null, hsMedia, grado, causa, factorOla, factorViento, limitante };
 }
 
 // Playa para la que Open-Meteo no respondió: sin semáforo.

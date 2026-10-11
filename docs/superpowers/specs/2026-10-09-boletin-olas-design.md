@@ -244,3 +244,17 @@ publicación en GitHub Pages; ráfagas 20 / 30 km/h).
   abierta, frase de tsunami con o sin "el", entidades HTML numéricas y de acentos, workflow con `pull --rebase` y
   `timeout-minutes`.
 - Avisos anteriores a 2026: fuera de alcance.
+
+### Ajuste del viento (2026-10-11)
+
+Tras una salida real a Los Yuyos (el 10/10) con poco viento, se comparó el modelo con el METAR del aeropuerto
+(SPJC): el viento medio del modelo (7–17 km/h) quedó incluso por debajo del medido (15–20 km/h), pero las
+**ráfagas** discrepan mucho entre modelos (GFS 4–10 km/h, ICON 14–25, ECMWF y la mezcla por defecto 19–42) y el
+aeropuerto no reportó ninguna. La celda de viento de Open-Meteo para Yuyos está a 9 km de la playa.
+
+- Ráfagas: verde ≤ 25, amarillo ≤ 40, rojo solo por encima de 40 km/h (antes 20 / 30).
+- `factorViento` por playa (config.json, 1 si falta), igual que `factorOla`: corrige viento medio y ráfagas; el valor
+  del modelo queda en `vientoModelo` / `rafagaModelo`. Se aprende de las salidas: impresión de viento (Calmo ≈ 5,
+  Moderado ≈ 15, Fuerte ≈ 25, Muy fuerte ≈ 35 km/h) / viento medio del modelo ese día, mediana con mínimo 3 salidas,
+  acotada a [0,2; 1,5]. Un registro por playa y día puede llevar olas, viento o ambos.
+- Pendiente (no implementado): consenso de varios modelos y mostrar el viento observado del aeropuerto.
