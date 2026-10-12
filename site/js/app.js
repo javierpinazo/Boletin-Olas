@@ -1,7 +1,7 @@
 import { cargarMar, horasDelDia, ahoraLima, mareasDelDia } from './mar.js';
 import {
   evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, ETIQUETA_NIVEL,
-  describirSinBloque, motivoHora,
+  describirSinBloque, motivoHora, gradoMar, colorRafaga, COLOR_GRADO, ETIQUETA_GRADO,
 } from './score.js';
 import {
   IMPRESIONES, IMPRESIONES_VIENTO, nuevaSalida, agregarSalida, factorAprendido, factorVientoAprendido, fusionar,
@@ -19,6 +19,7 @@ function el(tag, props = {}, ...hijos) {
   for (const [k, v] of Object.entries(props)) {
     if (k === 'class') nodo.className = v;
     else if (k === 'text') nodo.textContent = v;
+    else if (k === 'alto') nodo.style.height = v; // vía CSSOM: el CSP no permite el atributo style
     else nodo.setAttribute(k, v);
   }
   for (const h of hijos.flat()) if (h) nodo.append(h);
@@ -108,19 +109,42 @@ function evaluarTodo() {
 const COLOR_NIVEL = { normal: 'verde', ligero: 'verde', moderado: 'amarillo', fuerte: 'rojo', 'muy fuerte': 'rojo' };
 const colorNivel = (nivel) => COLOR_NIVEL[nivel] ?? 'gris';
 
+// Medidor del oleaje anómalo: 4 escalones (Normal / Leve / Medio / Alto) con el del día resaltado.
+// Sin aviso, o con aviso "condiciones normales", el día es normal.
+const PASOS_OLEAJE = [['normal', 'Normal', 'verde'], ['ligero', 'Leve', 'verde'], ['moderado', 'Medio', 'amarillo'], ['fuerte', 'Alto', 'rojo']];
+
 function bloqueOleaje(oleaje) {
-  const titulo = el('h2', { text: 'Oleaje anómalo (DHN)' });
-  if (!oleaje) {
-    return el('section', { class: 'oleaje' }, titulo, el('p', { class: 'gris', text: 'No hay aviso del DHN para este día.' }));
-  }
-  const unico = oleaje.grupos.every((g) => g.texto === oleaje.grupos[0].texto);
-  const grupos = unico ? [{ ...oleaje.grupos[0], playas: null }] : oleaje.grupos;
-  return el('section', { class: 'oleaje' }, titulo, grupos.map((g) => {
-    const color = colorNivel(g.nivelMax);
-    return el('p', {},
+  const { dhn, ahoraMs, config } = estado;
+  const sinDatos = !oleaje && estadoDhn(dhn, ahoraMs, config.umbrales) !== 'ok';
+  const orden = ['normal', 'ligero', 'moderado', 'fuerte', 'muy fuerte'];
+  const nivelDia = oleaje
+    ? oleaje.grupos.map((g) => g.nivelMax).filter(Boolean).reduce((a, b) => (orden.indexOf(b) > orden.indexOf(a) ? b : a), 'normal')
+    : 'normal';
+  const actual = nivelDia === 'muy fuerte' ? 'fuerte' : nivelDia;
+  const normal = actual === 'normal';
+  const color = colorNivel(nivelDia);
+  const titular = sinDatos
+    ? 'Sin datos del aviso del DHN'
+    : normal ? 'Día normal: sin oleaje anómalo' : `Oleaje anómalo ${ETIQUETA_NIVEL[nivelDia].toLowerCase()}`;
+  const subtitulo = sinDatos
+    ? 'Revisa dhn.mil.pe antes de salir.'
+    : normal
+      ? 'El DHN no tiene avisos de oleaje anómalo para este día.'
+      : null;
+  const medidor = el('div', { class: 'medidor', role: 'img', 'aria-label': `Oleaje anómalo: ${titular}` },
+    PASOS_OLEAJE.map(([clave, texto, c]) => el('span', { class: `paso ${c}${!sinDatos && clave === actual ? ' activo' : ''}`, text: texto })));
+  const unico = oleaje && oleaje.grupos.every((g) => g.texto === oleaje.grupos[0].texto);
+  const detalle = !oleaje || normal
+    ? []
+    : (unico ? [{ ...oleaje.grupos[0], playas: null }] : oleaje.grupos).map((g) => el('p', { class: 'grupo' },
       g.playas ? el('span', { class: 'gris', text: `${g.playas.join(', ')}: ` }) : null,
-      el('span', { class: `chip ${color}`, text: `${g.nivelMax ? SIMBOLO[color] + ' ' : ''}${g.texto}` }));
-  }));
+      el('span', { text: g.texto })));
+  return el('section', { class: `oleaje ${sinDatos ? 'gris' : color}` },
+    el('h2', { text: 'Oleaje anómalo (DHN)' }),
+    el('p', { class: 'titular', text: `${sinDatos ? '⚠' : SIMBOLO[color]} ${titular}` }),
+    subtitulo ? el('p', { class: 'gris', text: subtitulo }) : null,
+    medidor,
+    detalle);
 }
 
 function pintar() {
@@ -293,10 +317,10 @@ function tarjeta(r, oleaje) {
   if (r.estado === 'sin-mar') {
     return el('article', { class: 'playa sin-datos' }, el('h3', { text: r.playa.nombre }), el('p', { text: 'No pude obtener el mar ahora. Reintenta más tarde.' }));
   }
-  const resumen = el('summary', {},
-    el('span', { class: 'nombre', text: r.playa.nombre },
-      nivelDePlaya(r.playa, oleaje)),
+  const cabecera = el('div', { class: 'cabecera' },
+    el('span', { class: 'nombre', text: r.playa.nombre }, nivelDePlaya(r.playa, oleaje)),
     chipDePlaya(r));
+  const resumen = el('summary', { text: 'Detalle por hora y registro' });
   const filas = r.horas.map((h) => el('tr', { class: h.color },
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
     el('td', {},
@@ -321,7 +345,52 @@ function tarjeta(r, oleaje) {
     if (detalles.open) estado.abiertas.add(r.playa.id);
     else estado.abiertas.delete(r.playa.id);
   });
-  return el('article', { class: 'playa' }, detalles);
+  return el('article', { class: 'playa' }, cabecera, panelGrafico(r), detalles);
+}
+
+const pct = (v, max) => `${Math.max(6, Math.min(100, Math.round((v / max) * 100)))}%`;
+const colorViento = (kmh, u) => (kmh <= u.viento.verde ? 'verde' : kmh <= u.viento.amarillo ? 'amarillo' : 'rojo');
+
+// Lo esencial de la playa de un vistazo: tres cifras y la evolución hora a hora (semáforo, olas y viento).
+function panelGrafico(r) {
+  const { config } = estado;
+  const u = config.umbrales;
+  const datos = r.horas.filter((h) => typeof h.dato.hs === 'number');
+  if (!datos.length) return null;
+  const hsMedia = datos.reduce((s, h) => s + h.dato.hs, 0) / datos.length;
+  const vientoMax = Math.max(...r.horas.map((h) => h.dato.vientoKmh ?? 0));
+  const rafagaMax = Math.max(...r.horas.map((h) => h.dato.rafagaKmh ?? h.dato.vientoKmh ?? 0));
+  const grado = gradoMar(hsMedia, u);
+  const cifra = (valor, unidad, etiqueta, color) => el('div', { class: `cifra ${color}` },
+    el('span', { class: 'valor' }, valor, el('small', { text: ` ${unidad}` })),
+    el('span', { class: 'etiqueta', text: etiqueta }));
+  const cifras = el('div', { class: 'cifras' },
+    cifra(num1(hsMedia), 'm', `Ola · ${ETIQUETA_GRADO[grado].replace('Mar ', '').toLowerCase()}`, COLOR_GRADO[grado]),
+    cifra(String(Math.round(vientoMax)), 'km/h', 'Viento máx.', colorViento(vientoMax, u)),
+    cifra(String(Math.round(rafagaMax)), 'km/h', 'Ráfaga máx.', colorRafaga(rafagaMax, u).color));
+
+  const porHora = new Map(r.horas.map((h) => [Number(h.hora.slice(11, 13)), h]));
+  const horas = [];
+  for (let h = config.ventana.horaInicio; h < config.ventana.horaFin; h += 1) horas.push(h);
+  const fila = (titulo, celda) => el('div', { class: 'fila-graf' },
+    el('span', { class: 'rotulo', text: titulo }),
+    el('div', { class: 'columnas' }, horas.map((h) => celda(h, porHora.get(h)))));
+  const semaforo = fila('Apto', (h, d) => el('span', { class: `celda ${d ? d.color : 'gris'}`, title: d ? motivoHora(d) || 'Verde' : 'Sin datos' }));
+  const olas = fila('Ola (m)', (h, d) => el('span', { class: 'col' },
+    d && typeof d.dato.hs === 'number'
+      ? el('span', { class: `barra ${COLOR_GRADO[gradoMar(d.dato.hs, u)]}`, alto: pct(d.dato.hs, 2), title: `${num1(d.dato.hs)} m` })
+      : null));
+  const viento = fila('Viento', (h, d) => {
+    const kmh = d ? (d.dato.rafagaKmh ?? d.dato.vientoKmh) : null;
+    return el('span', { class: 'col' },
+      typeof kmh === 'number'
+        ? el('span', { class: `barra ${colorRafaga(kmh, u).color}`, alto: pct(kmh, 50), title: `Ráfaga ${Math.round(kmh)} km/h` })
+        : null);
+  });
+  const horasEtiqueta = el('div', { class: 'fila-graf' },
+    el('span', { class: 'rotulo' }),
+    el('div', { class: 'columnas horas' }, horas.map((h) => el('span', { text: h % 2 === 0 ? String(h) : '' }))));
+  return el('div', { class: 'grafico' }, cifras, semaforo, olas, viento, horasEtiqueta);
 }
 
 function exportarSalidas() {
