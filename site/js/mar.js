@@ -7,7 +7,10 @@ const COMUN = 'forecast_days=3&timezone=America%2FLima';
 const CAMPOS_MAR = {
   wave_height: 'hs', wave_period: 'tp', wave_direction: 'dirOla', sea_level_height_msl: 'nivelMar',
 };
-const CAMPOS_VIENTO = { wind_speed_10m: 'vientoKmh', wind_direction_10m: 'dirViento', wind_gusts_10m: 'rafagaKmh' };
+const CAMPOS_VIENTO = {
+  wind_speed_10m: 'vientoKmh', wind_direction_10m: 'dirViento', wind_gusts_10m: 'rafagaKmh',
+  temperature_2m: 'tempAire', cloud_cover: 'nubes', sunshine_duration: 'solSeg', // clima: no entra en el semáforo
+};
 
 export const urlMar = (p) =>
   `${MARINO}?latitude=${p.lat}&longitude=${p.lon}&hourly=${Object.keys(CAMPOS_MAR).join(',')}&${COMUN}`;
@@ -15,7 +18,7 @@ export const urlViento = (p) =>
   `${VIENTO}?latitude=${p.lat}&longitude=${p.lon}&hourly=${Object.keys(CAMPOS_VIENTO).join(',')}&${COMUN}`;
 
 // Une las dos respuestas por hora ('2026-10-09T07:00', hora de Lima). Devuelve
-// [{hora, hs, tp, dirOla, nivelMar, vientoKmh, dirViento, rafagaKmh}], con null donde no hay dato.
+// [{hora, hs, tp, dirOla, nivelMar, vientoKmh, dirViento, rafagaKmh, tempAire, nubes, solSeg}], con null donde no hay dato.
 export function combinarHoras(mar, viento) {
   const porHora = new Map();
   const vacia = (hora) => ({ hora, ...Object.fromEntries([...Object.values(CAMPOS_MAR), ...Object.values(CAMPOS_VIENTO)].map((c) => [c, null])) });

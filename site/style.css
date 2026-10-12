@@ -192,3 +192,10 @@ footer p { margin: 6px 0; }
 .temperatura.frio .historico .area { fill: var(--verde-fondo); }
 .historico .l-actual { stroke: var(--naranja); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .historico .l-normal { stroke: var(--suave); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+
+/* ---------- Clima (sol y aire) ---------- */
+.cifras.clima { grid-template-columns: repeat(2, 1fr); margin-top: -4px; }
+.cifra.sol { background: #fff3c4; color: #8a5a00; }
+.cifra.neutro { background: var(--borde); color: var(--texto); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .cifra.sol { background: #3a2e0d; color: #f2c14e; } }
+.columnas .barra.sol { background: #f2b705; }

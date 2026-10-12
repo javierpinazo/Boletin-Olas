@@ -437,6 +437,17 @@ function tarjeta(r, oleaje) {
 const pct = (v, max) => `${Math.max(6, Math.min(100, Math.round((v / max) * 100)))}%`;
 const colorViento = (kmh, u) => (kmh <= u.viento.verde ? 'verde' : kmh <= u.viento.amarillo ? 'amarillo' : 'rojo');
 
+// Clima de la playa (no entra en el semáforo): horas de sol directo y temperatura del aire en la ventana de remo.
+function climaDelDia(horasDia) {
+  const hs = horasDia.filter((h) => typeof h.dato.solSeg === 'number' && typeof h.dato.tempAire === 'number');
+  if (!hs.length) return null;
+  const horasSol = hs.reduce((s, h) => s + h.dato.solSeg, 0) / 3600;
+  const fraccion = horasSol / hs.length;
+  const temps = hs.map((h) => h.dato.tempAire);
+  const [etiqueta, color] = fraccion >= 0.7 ? ['soleado', 'sol'] : fraccion >= 0.3 ? ['sol y nubes', 'amarillo'] : ['nublado', 'neutro'];
+  return { horasSol, etiqueta, color, min: Math.min(...temps), max: Math.max(...temps) };
+}
+
 // Lo esencial de la playa de un vistazo: tres cifras y la evolución hora a hora (semáforo, olas y viento).
 function panelGrafico(r) {
   const { config } = estado;
@@ -454,6 +465,10 @@ function panelGrafico(r) {
     cifra(num1(hsMedia), 'm', `Ola · ${ETIQUETA_GRADO[grado].replace('Mar ', '').toLowerCase()}`, COLOR_GRADO[grado]),
     cifra(String(Math.round(vientoMax)), 'km/h', 'Viento máx.', colorViento(vientoMax, u)),
     cifra(String(Math.round(rafagaMax)), 'km/h', 'Ráfaga máx.', colorRafaga(rafagaMax, u).color));
+  const clima = climaDelDia(r.horasDia);
+  const cifrasClima = clima && el('div', { class: 'cifras clima' },
+    cifra(String(Math.round(clima.horasSol * 10) / 10).replace('.', ','), 'h', `Sol directo · ${clima.etiqueta}`, clima.color),
+    cifra(`${Math.round(clima.min)}–${Math.round(clima.max)}`, '°C', 'Aire (mín–máx)', 'neutro'));
 
   const ahoraH = ahoraLima(estado.ahoraMs).slice(0, 13);
   const porHora = new Map(r.horasDia.map((h) => [Number(h.hora.slice(11, 13)), h]));
@@ -475,11 +490,15 @@ function panelGrafico(r) {
         ? el('span', { class: `barra ${colorRafaga(kmh, u).color}${pasada(d)}`, alto: pct(kmh, 50), title: `Ráfaga ${Math.round(kmh)} km/h` })
         : null);
   });
+  const sol = fila('Sol', (h, d) => el('span', { class: 'col' },
+    d && typeof d.dato.solSeg === 'number'
+      ? el('span', { class: `barra sol${pasada(d)}`, alto: pct(d.dato.solSeg, 3600), title: `${Math.round(d.dato.solSeg / 60)} min de sol${typeof d.dato.nubes === 'number' ? ` · nubes ${Math.round(d.dato.nubes)} %` : ''}${typeof d.dato.tempAire === 'number' ? ` · ${num1(d.dato.tempAire)} °C` : ''}` })
+      : null));
   const horasEtiqueta = el('div', { class: 'fila-graf' },
     el('span', { class: 'rotulo' }),
     el('div', { class: 'columnas horas' }, horas.map((h) => el('span', { text: h % 2 === 0 ? String(h) : '' }))));
   const leyenda = estado.dia === 0 ? el('p', { class: 'gris pequeno', text: 'Las horas ya pasadas aparecen atenuadas.' }) : null;
-  return el('div', { class: 'grafico' }, cifras, semaforo, olas, viento, horasEtiqueta, leyenda);
+  return el('div', { class: 'grafico' }, cifras, cifrasClima, semaforo, olas, viento, clima ? sol : null, horasEtiqueta, leyenda);
 }
 
 function exportarSalidas() {

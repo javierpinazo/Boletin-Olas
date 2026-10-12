@@ -9,7 +9,7 @@ test('combinarHoras une por hora y conserva los nulos', () => {
   const h = combinarHoras(marJson, vientoJson);
   assert.deepEqual(h[0], {
     hora: '2026-10-09T06:00', hs: 0.7, tp: 9.1, vientoKmh: 5, dirViento: 200,
-    dirOla: null, nivelMar: null, rafagaKmh: null,
+    dirOla: null, nivelMar: null, rafagaKmh: null, tempAire: null, nubes: null, solSeg: null,
   });
   assert.equal(h[1].hs, null);
   assert.throws(() => combinarHoras({}, vientoJson), /sin datos horarios/);
