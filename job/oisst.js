@@ -28,7 +28,7 @@ export async function pedirCelda({ lat, lon, desde, hasta, reciente = false, fet
   const la = centroCelda(lat);
   for (let paso = 0; paso < 3; paso += 1) {
     const lo = centroCelda(lon) - 0.25 * paso;
-    const tiempo = reciente ? `(last-${hasta}):1:(last)` : `(${desde}):1:(${hasta})`;
+    const tiempo = reciente ? `(${desde}):1:(last)` : `(${desde}):1:(${hasta})`;
     const url = `${BASE}/${dataset}.csv?sst%5B${tiempo}%5D%5B(0.0):1:(0.0)%5D%5B(${la}):1:(${la})%5D%5B(${lo}):1:(${lo})%5D`;
     const texto = await pedirTexto(url, fetchFn);
     const filas = texto.trim().split('\n').slice(2)

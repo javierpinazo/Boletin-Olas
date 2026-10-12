@@ -17,7 +17,7 @@ test('pedirCelda: si la celda es tierra (NaN) prueba la de más al oeste', async
     urls.push(url);
     return ok(urls.length === 1 ? csv('2026-10-11T12:00:00Z,0.0,-12.125,-76.875,NaN') : csv('2026-10-11T12:00:00Z,0.0,-12.125,-77.125,23.25'));
   };
-  const r = await pedirCelda({ lat: -12.149, lon: -76.9, hasta: 4, reciente: true, fetchFn });
+  const r = await pedirCelda({ lat: -12.149, lon: -76.9, desde: '2026-10-07', reciente: true, fetchFn });
   assert.equal(r.filas[0].sst, 23.25);
   assert.equal(urls.length, 2);
 });
@@ -25,5 +25,5 @@ test('pedirCelda: si la celda es tierra (NaN) prueba la de más al oeste', async
 test('construirTempMar: toma el último día publicado de cada playa', async () => {
   const fetchFn = async () => ok(csv('2026-10-10T12:00:00Z,0,0,0,23.1', '2026-10-11T12:00:00Z,0,0,0,23.25'));
   const t = await construirTempMar([{ id: 'yuyos', lat: -12.149, lon: -77.026 }], { fetchFn, ahora: new Date('2026-10-12T15:00:00Z') });
-  assert.deepEqual(t.playas.yuyos, { fecha: '2026-10-11', actual: 23.3 });
+  assert.deepEqual(t.playas.yuyos, { fecha: '2026-10-11', actual: 23.3, serie: [['2026-10-10', 23.1], ['2026-10-11', 23.3]] });
 });

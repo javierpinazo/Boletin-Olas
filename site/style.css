@@ -184,3 +184,11 @@ footer p { margin: 6px 0; }
 .escala .marca { position: absolute; top: -4px; width: 6px; height: 18px; margin-left: -3px; border-radius: 3px; background: var(--texto); outline: 2px solid var(--tarjeta); }
 .escala-rotulos { display: flex; justify-content: space-between; font-size: .7rem; color: var(--suave); margin-top: 3px; }
 .pequeno { font-size: .78rem; margin: 8px 0 0; }
+.columnas .pasada { opacity: .45; }
+.historico-caja { margin-top: 12px; }
+.historico-caja .pequeno { margin: 0 0 4px; }
+.historico { display: block; width: 100%; height: 90px; }
+.historico .area { fill: var(--naranja-fondo); stroke: none; }
+.temperatura.frio .historico .area { fill: var(--verde-fondo); }
+.historico .l-actual { stroke: var(--naranja); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.historico .l-normal { stroke: var(--suave); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }

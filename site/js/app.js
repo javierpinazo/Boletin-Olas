@@ -84,22 +84,24 @@ function evaluarTodo() {
     const aprendido = factorAprendido(estado.salidas, playa.id);
     const aprendidoViento = factorVientoAprendido(estado.salidas, playa.id);
     const horas = estado.mar[i];
-    const base = horas
-      ? evaluarPlayaDia({
-        playa: {
-          ...playa,
-          ...(aprendido ? { factorOla: aprendido.factor } : {}),
-          ...(aprendidoViento ? { factorViento: aprendidoViento.factor } : {}),
-        },
-        horasCrudas: horasDelDia(horas, fecha, config.ventana, ahoraMs),
-        aviso: dhn?.aviso ?? null,
-        dhn,
-        ahoraMs,
-        config,
-        tsunamiAlerta: tsun.estado === 'alerta',
-      })
-      : resultadoSinMar(playa);
-    return { ...base, playa, indice: i, aprendido, aprendidoViento, mareas: horas ? mareasDelDia(horas, fecha) : [] };
+    const playaFactores = {
+      ...playa,
+      ...(aprendido ? { factorOla: aprendido.factor } : {}),
+      ...(aprendidoViento ? { factorViento: aprendidoViento.factor } : {}),
+    };
+    const evaluar = (desdeMs) => evaluarPlayaDia({
+      playa: playaFactores,
+      horasCrudas: horasDelDia(horas, fecha, config.ventana, desdeMs),
+      aviso: dhn?.aviso ?? null,
+      dhn,
+      ahoraMs,
+      config,
+      tsunamiAlerta: tsun.estado === 'alerta',
+    });
+    const base = horas ? evaluar(ahoraMs) : resultadoSinMar(playa);
+    // Para los gráficos se muestra el día completo (incluidas las horas ya pasadas); el veredicto usa solo lo que queda.
+    const horasDia = horas ? evaluar(Date.parse(`${fecha}T00:00:00-05:00`)).horas : [];
+    return { ...base, horasDia, playa, indice: i, aprendido, aprendidoViento, mareas: horas ? mareasDelDia(horas, fecha) : [] };
   });
   const oleaje = resumenOleajeDia({
     aviso: dhn?.aviso ?? null, playas: config.playas, fecha, ventana: config.ventana,
@@ -169,8 +171,9 @@ function bloqueTemperatura() {
   const titular = tono === 'normal'
     ? 'Dentro de lo habitual'
     : `${num1(Math.abs(dif))} °C ${tono === 'calido' ? 'más cálido' : 'más frío'} de lo habitual`;
-  // Escala de -4 a +4 °C respecto a lo habitual, con el centro como "normal".
-  const posicion = Math.max(0, Math.min(100, 50 + (dif / 4) * 50));
+  // Escala simétrica respecto a lo habitual: empieza en ±4 °C y crece de 2 en 2 (6, 8, 10…) si la diferencia la supera.
+  const limite = Math.max(4, Math.ceil(Math.abs(dif) / 2) * 2);
+  const posicion = Math.max(0, Math.min(100, 50 + (dif / limite) * 50));
   const marca = el('span', { class: 'marca' });
   marca.style.left = `${posicion}%`;
   return el('section', { class: `temperatura ${tono}` },
@@ -181,8 +184,52 @@ function bloqueTemperatura() {
       el('div', {}, el('span', { class: 'grande dif', text: `${dif > 0 ? '+' : ''}${num1(dif)} °C` }), el('span', { class: 'etiqueta', text: 'Diferencia' }))),
     el('p', { class: 'titular', text: titular }),
     el('div', { class: 'escala', role: 'img', 'aria-label': `${titular}` }, marca),
-    el('div', { class: 'escala-rotulos' }, el('span', { text: '−4 °C' }), el('span', { text: 'habitual' }), el('span', { text: '+4 °C' })),
+    el('div', { class: 'escala-rotulos' }, el('span', { text: `−${limite} °C` }), el('span', { text: 'habitual' }), el('span', { text: `+${limite} °C` })),
+    graficoHistorico(),
     el('p', { class: 'gris pequeno', text: `Lectura satelital del ${fechaCorta(Date.parse(`${medidas[0].fecha}T12:00:00-05:00`))} (NOAA OISST, preliminar); habitual = promedio 1991–2020 de ese día. Es del mar abierto frente a la costa: en la orilla puede variar.` }));
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+function svg(tag, attrs, ...hijos) {
+  const n = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  n.append(...hijos.filter(Boolean));
+  return n;
+}
+
+// Últimos días: temperatura real (línea) frente a la habitual de cada día (línea punteada), promedio de las playas.
+function graficoHistorico() {
+  const { tempMar, climaMar, config } = estado;
+  const porFecha = new Map();
+  for (const p of config.playas) {
+    for (const [fecha, sst] of tempMar.playas?.[p.id]?.serie ?? []) {
+      const normal = climaMar.playas?.[p.id]?.[diaDelAnio(fecha)];
+      if (typeof normal !== 'number') continue;
+      const a = porFecha.get(fecha) ?? { sst: 0, normal: 0, n: 0 };
+      a.sst += sst; a.normal += normal; a.n += 1;
+      porFecha.set(fecha, a);
+    }
+  }
+  const puntos = [...porFecha.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([fecha, a]) => ({ fecha, sst: a.sst / a.n, normal: a.normal / a.n }));
+  if (puntos.length < 5) return null;
+  const todos = puntos.flatMap((p) => [p.sst, p.normal]);
+  const min = Math.floor(Math.min(...todos)) - 1;
+  const max = Math.ceil(Math.max(...todos)) + 1;
+  const W = 300; const H = 90;
+  const x = (i) => Math.round((i / (puntos.length - 1)) * W * 10) / 10;
+  const y = (v) => Math.round((H - ((v - min) / (max - min)) * H) * 10) / 10;
+  const linea = (campo) => puntos.map((p, i) => `${x(i)},${y(p[campo])}`).join(' ');
+  const area = `${linea('sst')} ${W},${y(puntos[puntos.length - 1].normal)} ${[...puntos].reverse().map((p, i) => `${x(puntos.length - 1 - i)},${y(p.normal)}`).join(' ')}`;
+  const dibujo = svg('svg', { viewBox: `0 0 ${W} ${H}`, class: 'historico', role: 'img', 'aria-label': 'Temperatura del mar de los últimos días frente a la habitual', preserveAspectRatio: 'none' },
+    svg('polygon', { points: area, class: 'area' }),
+    svg('polyline', { points: linea('normal'), class: 'l-normal', fill: 'none' }),
+    svg('polyline', { points: linea('sst'), class: 'l-actual', fill: 'none' }));
+  const f = (iso) => fechaCorta(Date.parse(`${iso}T12:00:00-05:00`));
+  return el('div', { class: 'historico-caja' },
+    el('p', { class: 'gris pequeno', text: `Últimos ${puntos.length} días: línea continua = real, punteada = habitual. Eje de ${min} a ${max} °C.` }),
+    dibujo,
+    el('div', { class: 'escala-rotulos' }, el('span', { text: f(puntos[0].fecha) }), el('span', { text: f(puntos[puntos.length - 1].fecha) })));
 }
 
 function pintar() {
@@ -408,28 +455,31 @@ function panelGrafico(r) {
     cifra(String(Math.round(vientoMax)), 'km/h', 'Viento máx.', colorViento(vientoMax, u)),
     cifra(String(Math.round(rafagaMax)), 'km/h', 'Ráfaga máx.', colorRafaga(rafagaMax, u).color));
 
-  const porHora = new Map(r.horas.map((h) => [Number(h.hora.slice(11, 13)), h]));
+  const ahoraH = ahoraLima(estado.ahoraMs).slice(0, 13);
+  const porHora = new Map(r.horasDia.map((h) => [Number(h.hora.slice(11, 13)), h]));
   const horas = [];
   for (let h = config.ventana.horaInicio; h < config.ventana.horaFin; h += 1) horas.push(h);
   const fila = (titulo, celda) => el('div', { class: 'fila-graf' },
     el('span', { class: 'rotulo', text: titulo }),
     el('div', { class: 'columnas' }, horas.map((h) => celda(h, porHora.get(h)))));
-  const semaforo = fila('Apto', (h, d) => el('span', { class: `celda ${d ? d.color : 'gris'}`, title: d ? motivoHora(d) || 'Verde' : 'Sin datos' }));
+  const pasada = (d) => (estado.dia === 0 && d && d.hora.slice(0, 13) < ahoraH ? ' pasada' : '');
+  const semaforo = fila('Apto', (h, d) => el('span', { class: `celda ${d ? d.color : 'gris'}${pasada(d)}`, title: d ? motivoHora(d) || 'Verde' : 'Sin datos' }));
   const olas = fila('Ola (m)', (h, d) => el('span', { class: 'col' },
     d && typeof d.dato.hs === 'number'
-      ? el('span', { class: `barra ${COLOR_GRADO[gradoMar(d.dato.hs, u)]}`, alto: pct(d.dato.hs, 2), title: `${num1(d.dato.hs)} m` })
+      ? el('span', { class: `barra ${COLOR_GRADO[gradoMar(d.dato.hs, u)]}${pasada(d)}`, alto: pct(d.dato.hs, 2), title: `${num1(d.dato.hs)} m` })
       : null));
   const viento = fila('Viento', (h, d) => {
     const kmh = d ? (d.dato.rafagaKmh ?? d.dato.vientoKmh) : null;
     return el('span', { class: 'col' },
       typeof kmh === 'number'
-        ? el('span', { class: `barra ${colorRafaga(kmh, u).color}`, alto: pct(kmh, 50), title: `Ráfaga ${Math.round(kmh)} km/h` })
+        ? el('span', { class: `barra ${colorRafaga(kmh, u).color}${pasada(d)}`, alto: pct(kmh, 50), title: `Ráfaga ${Math.round(kmh)} km/h` })
         : null);
   });
   const horasEtiqueta = el('div', { class: 'fila-graf' },
     el('span', { class: 'rotulo' }),
     el('div', { class: 'columnas horas' }, horas.map((h) => el('span', { text: h % 2 === 0 ? String(h) : '' }))));
-  return el('div', { class: 'grafico' }, cifras, semaforo, olas, viento, horasEtiqueta);
+  const leyenda = estado.dia === 0 ? el('p', { class: 'gris pequeno', text: 'Las horas ya pasadas aparecen atenuadas.' }) : null;
+  return el('div', { class: 'grafico' }, cifras, semaforo, olas, viento, horasEtiqueta, leyenda);
 }
 
 function exportarSalidas() {
