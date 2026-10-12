@@ -18,6 +18,11 @@ export function armarSitio(raiz) {
       fs.mkdirSync(path.join(nueva, 'data'), { recursive: true });
       fs.copyFileSync(dhn, path.join(nueva, 'data', 'dhn.json'));
     }
+    const temp = path.join(raiz, 'data', 'temp-mar.json');
+    if (fs.existsSync(temp)) {
+      fs.mkdirSync(path.join(nueva, 'data'), { recursive: true });
+      fs.copyFileSync(temp, path.join(nueva, 'data', 'temp-mar.json'));
+    }
   } catch (e) {
     fs.rmSync(nueva, { recursive: true, force: true });
     throw e;

@@ -168,3 +168,19 @@ footer p { margin: 6px 0; }
 .columnas .naranja { background: var(--naranja); }
 .columnas .rojo { background: var(--rojo); }
 .columnas.horas span { font-size: .68rem; color: var(--suave); text-align: center; }
+
+/* ---------- Temperatura del mar ---------- */
+.temperatura { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 12px 16px; }
+.temperatura h2 { margin: 0 0 8px; font-size: .8rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.temp-cifras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.temp-cifras .grande { display: block; font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+.temp-cifras .grande.suave { color: var(--suave); }
+.temp-cifras .etiqueta { display: block; font-size: .75rem; color: var(--suave); margin-top: 2px; }
+.temperatura .titular { margin: 10px 0 8px; font-size: 1.1rem; font-weight: 700; text-align: center; }
+.temperatura.calido .titular, .temperatura.calido .dif { color: var(--naranja); }
+.temperatura.frio .titular, .temperatura.frio .dif { color: var(--acento); }
+.temperatura.normal .titular, .temperatura.normal .dif { color: var(--verde); }
+.escala { position: relative; height: 10px; border-radius: 999px; background: linear-gradient(90deg, var(--acento), var(--borde) 40%, var(--borde) 60%, var(--naranja)); }
+.escala .marca { position: absolute; top: -4px; width: 6px; height: 18px; margin-left: -3px; border-radius: 3px; background: var(--texto); outline: 2px solid var(--tarjeta); }
+.escala-rotulos { display: flex; justify-content: space-between; font-size: .7rem; color: var(--suave); margin-top: 3px; }
+.pequeno { font-size: .78rem; margin: 8px 0 0; }

@@ -49,7 +49,7 @@ async function cargarJson(url) {
 
 const estado = {
   dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0, diaCargado: null,
-  salidas: [], abiertas: new Set(), mensajeSalidas: '',
+  tempMar: null, climaMar: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
 };
 
 async function iniciar() {
@@ -57,6 +57,8 @@ async function iniciar() {
   raiz.replaceChildren(el('p', { class: 'cargando', text: 'Consultando el mar y el aviso del DHN…' }));
   estado.config = await cargarJson('./config.json');
   estado.dhn = await cargarJson('./data/dhn.json').catch(() => null);
+  estado.tempMar = await cargarJson('./data/temp-mar.json').catch(() => null);
+  estado.climaMar = await cargarJson('./clima-mar.json').catch(() => null);
   const resultados = await Promise.allSettled(estado.config.playas.map((p) => cargarMar(p)));
   estado.mar = resultados.map((r) => (r.status === 'fulfilled' ? r.value : null));
   estado.salidas = leerSalidas(almacen());
@@ -147,6 +149,42 @@ function bloqueOleaje(oleaje) {
     detalle);
 }
 
+// Temperatura del mar (NOAA OISST) frente a lo habitual de ese día del año (media 1991–2020).
+const diaDelAnio = (iso) => Math.floor((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${iso.slice(0, 4)}-01-01T00:00:00Z`)) / 864e5);
+
+function bloqueTemperatura() {
+  const { tempMar, climaMar, config } = estado;
+  if (!tempMar || !climaMar) return null;
+  const medidas = config.playas.map((p) => {
+    const t = tempMar.playas?.[p.id];
+    const normal = climaMar.playas?.[p.id]?.[t ? diaDelAnio(t.fecha) : 0];
+    return t && typeof normal === 'number' ? { actual: t.actual, normal, fecha: t.fecha } : null;
+  }).filter(Boolean);
+  if (!medidas.length) return null;
+  const prom = (k) => medidas.reduce((s, m) => s + m[k], 0) / medidas.length;
+  const actual = prom('actual');
+  const normal = prom('normal');
+  const dif = Math.round((actual - normal) * 10) / 10;
+  const tono = dif >= 0.5 ? 'calido' : dif <= -0.5 ? 'frio' : 'normal';
+  const titular = tono === 'normal'
+    ? 'Dentro de lo habitual'
+    : `${num1(Math.abs(dif))} °C ${tono === 'calido' ? 'más cálido' : 'más frío'} de lo habitual`;
+  // Escala de -4 a +4 °C respecto a lo habitual, con el centro como "normal".
+  const posicion = Math.max(0, Math.min(100, 50 + (dif / 4) * 50));
+  const marca = el('span', { class: 'marca' });
+  marca.style.left = `${posicion}%`;
+  return el('section', { class: `temperatura ${tono}` },
+    el('h2', { text: 'Temperatura del mar' }),
+    el('div', { class: 'temp-cifras' },
+      el('div', {}, el('span', { class: 'grande', text: `${num1(actual)} °C` }), el('span', { class: 'etiqueta', text: 'Actual' })),
+      el('div', {}, el('span', { class: 'grande suave', text: `${num1(normal)} °C` }), el('span', { class: 'etiqueta', text: 'Habitual' })),
+      el('div', {}, el('span', { class: 'grande dif', text: `${dif > 0 ? '+' : ''}${num1(dif)} °C` }), el('span', { class: 'etiqueta', text: 'Diferencia' }))),
+    el('p', { class: 'titular', text: titular }),
+    el('div', { class: 'escala', role: 'img', 'aria-label': `${titular}` }, marca),
+    el('div', { class: 'escala-rotulos' }, el('span', { text: '−4 °C' }), el('span', { text: 'habitual' }), el('span', { text: '+4 °C' })),
+    el('p', { class: 'gris pequeno', text: `Lectura satelital del ${fechaCorta(Date.parse(`${medidas[0].fecha}T12:00:00-05:00`))} (NOAA OISST, preliminar); habitual = promedio 1991–2020 de ese día. Es del mar abierto frente a la costa: en la orilla puede variar.` }));
+}
+
 function pintar() {
   const { tsun, resultados, oleaje } = evaluarTodo();
   const raiz = document.getElementById('app');
@@ -156,6 +194,7 @@ function pintar() {
     bannerOleaje(resultados),
     pestanas(),
     bloqueOleaje(oleaje),
+    bloqueTemperatura(),
     mejorOpcion(resultados),
     ...resultados.map((r) => tarjeta(r, oleaje)),
     panelSalidas(),
