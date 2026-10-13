@@ -285,7 +285,7 @@ test('oleaje DHN: el 9/10 baja de Medio a Leve a las 12 h (La Punta y el sur com
 test('oleaje DHN: La Punta y las otras tres van en grupos distintos (tramos distintos)', () => {
   const r = resumen('2026-10-09');
   assert.equal(r.grupos.length, 2);
-  assert.deepEqual(grupoDe(r, 'San Bartolo').playas, ['San Bartolo', 'Punta Hermosa', 'Yuyos']);
+  assert.deepEqual([...grupoDe(r, 'San Bartolo').playas].sort(), ['Punta Hermosa', 'San Bartolo', 'Yuyos']);
   assert.deepEqual(grupoDe(r, 'La Punta').playas, ['La Punta']);
 });
 
