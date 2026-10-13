@@ -68,3 +68,10 @@ navegador ──▶ Open-Meteo (oleaje, viento, mareas) en vivo
   versión nueva a todos los navegadores; con **Ctrl+F5** se fuerza. Los datos (`data/dhn.json`) van con `no-store`.
 - Mientras el flujo de n8n no esté activo, `dhn.json` solo se actualiza al ejecutar `actualizar.sh` o
   `actualizar-codigo.sh` a mano, y la página mostrará el banner de "datos del DHN con más de 3 horas".
+
+## Dominio (2026-10-13)
+
+La página responde en **https://olaspaddle.duckdns.org** (DuckDNS, registro A → IP de la VPS; certificado con el
+certbot del host). `olas.veripago.pe` redirige (301) al nuevo. Config en `nginx-olaspaddle.duckdns.org.conf`
+(copia de la plantilla con el nombre cambiado; el HTTPS lo añadió certbot). Copia del server block anterior en
+`/home/PayHub/olas.veripago.pe.nginx.bak` (servidor).
