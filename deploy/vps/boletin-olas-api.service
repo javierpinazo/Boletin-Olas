@@ -1,0 +1,21 @@
+# /etc/systemd/system/boletin-olas-api.service
+# Servicio mínimo (Node 22 del host) que refresca los datos cuando alguien abre la página. Solo 127.0.0.1.
+[Unit]
+Description=Boletin Olas - actualizar datos al abrir la pagina
+After=network.target
+
+[Service]
+User=PayHub
+WorkingDirectory=/opt/boletin-olas
+ExecStart=/usr/bin/node job/servidor.js
+Restart=on-failure
+RestartSec=5
+Nice=10
+MemoryMax=150M
+CPUQuota=50%
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=false
+
+[Install]
+WantedBy=multi-user.target

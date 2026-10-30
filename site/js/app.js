@@ -49,7 +49,7 @@ async function cargarJson(url) {
 
 const estado = {
   dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0, diaCargado: null,
-  tempMar: null, climaMar: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
+  actualizando: false, ultimoRefresco: 0, tempMar: null, climaMar: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
 };
 
 async function iniciar() {
@@ -65,6 +65,27 @@ async function iniciar() {
   estado.ahoraMs = Date.now();
   estado.marMs = estado.ahoraMs;
   estado.diaCargado = ahoraLima(estado.ahoraMs).slice(0, 10);
+  pintar();
+  refrescar();
+}
+
+// Pide a la VPS que relea el DHN y la temperatura del mar. El servidor decide: solo lo hace si el último dato
+// tiene 3 h o más (además del cron diario de las 6 a. m.). Si lo hizo, se vuelven a leer los archivos.
+async function refrescar() {
+  estado.ultimoRefresco = Date.now();
+  estado.actualizando = estadoDhn(estado.dhn, estado.ahoraMs, estado.config.umbrales) !== 'ok';
+  if (estado.actualizando) pintar();
+  try {
+    const r = await fetch('/api/actualizar', { cache: 'no-store', signal: AbortSignal.timeout(100_000) });
+    if (r.ok && (await r.json()).actualizado) {
+      estado.dhn = await cargarJson('./data/dhn.json').catch(() => estado.dhn);
+      estado.tempMar = await cargarJson('./data/temp-mar.json').catch(() => estado.tempMar);
+      estado.ahoraMs = Date.now();
+    }
+  } catch {
+    // sin servicio de actualización (p. ej. en local): se queda con lo que hay
+  }
+  estado.actualizando = false;
   pintar();
 }
 
@@ -237,6 +258,7 @@ function pintar() {
   const raiz = document.getElementById('app');
   const piezas = [
     bannerTsunami(tsun),
+    bannerActualizando(),
     bannerDhn(),
     bannerOleaje(resultados),
     pestanas(),
@@ -265,6 +287,10 @@ function bannerOleaje(resultados) {
   return el('section', { class: 'banner rojo', role: 'alert' },
     el('strong', { text: `✖ Oleaje ${alerta.nivel} según el DHN` }),
     el('p', { text: 'Hay horas de este día con oleaje anómalo fuerte: esas horas figuran en rojo.' }));
+}
+
+function bannerActualizando() {
+  return estado.actualizando ? el('p', { class: 'gris', role: 'status', text: 'Actualizando los datos del DHN…' }) : null;
 }
 
 function bannerDhn() {
@@ -561,6 +587,11 @@ function mostrarError(e) {
 }
 
 iniciar().catch(mostrarError);
+
+// Al volver a la pestaña tras 3 h o más se pide de nuevo (el servidor decide si hace falta).
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && estado.config && Date.now() - estado.ultimoRefresco >= 3 * 3600_000) refrescar();
+});
 
 // Si la pestaña queda abierta de un día para otro, "Hoy" se recarga solo con los datos del nuevo día.
 setInterval(() => {
