@@ -75,3 +75,14 @@ La página responde en **https://olaspaddle.duckdns.org** (DuckDNS, registro A �
 certbot del host). `olas.veripago.pe` redirige (301) al nuevo. Config en `nginx-olaspaddle.duckdns.org.conf`
 (copia de la plantilla con el nombre cambiado; el HTTPS lo añadió certbot). Copia del server block anterior en
 `/home/PayHub/olas.veripago.pe.nginx.bak` (servidor).
+
+## Actualización de datos (2026-10-30) — sustituye al flujo horario de n8n
+
+Reglas: (1) al abrir la página, `site/js/app.js` pide `GET /api/actualizar`; (2) el servicio `boletin-olas-api`
+(`job/servidor.js`, 127.0.0.1:8091, `MemoryMax=150M`) solo lee el DHN y la temperatura del mar si el último dato tiene
+**3 h o más** (`job/refresco.js`), y tras un fallo espera 5 min; (3) el cron de `PayHub` corre `actualizar.sh` cada día a las
+**6:00 de Lima (11:00 UTC)**. Los flujos de n8n ya no hacen falta. Con una lectura reciente la respuesta es inmediata; si
+hay que leer, tarda ~15 s y la página la muestra sola al terminar.
+Instalación: `deploy/vps/boletin-olas-api.service` → `/etc/systemd/system/`, `systemctl enable --now boletin-olas-api`;
+el bloque `location = /api/actualizar` de `nginx-olaspaddle.duckdns.org.conf` va dentro del server HTTPS.
+Registro del cron: `/home/PayHub/boletin-olas-cron.log`.
