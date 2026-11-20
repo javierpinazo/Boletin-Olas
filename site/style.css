@@ -213,3 +213,9 @@ footer p { margin: 6px 0; }
 .grifo .monto { font-size: 1.25rem; font-weight: 700; }
 .grifos .zona-nombre { margin: 10px 0 2px; font-size: .82rem; color: var(--suave); font-weight: 600; }
 .grifos .chip { font-size: .75rem; padding: 2px 8px; }
+
+.grifo .lado { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.grifo .ir { display: flex; flex-direction: column; gap: 4px; }
+.boton-ir { display: block; min-width: 56px; text-align: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--acento); color: var(--acento); font-size: .78rem; font-weight: 600; text-decoration: none; }
+.boton-ir.waze { background: var(--acento); color: #fff; }
+.boton-ir:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }

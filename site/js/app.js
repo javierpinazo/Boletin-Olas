@@ -569,6 +569,13 @@ function panelSalidas() {
 const soles = (n) => `S/ ${(Math.round(n * 100) / 100).toFixed(2).replace('.', ',')}`;
 const titulo = (t) => t.toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase());
 const nombreGrifo = (g) => g.nombre ?? titulo(g.razon);
+// El registro no trae coordenadas: se navega por dirección (hasta la primera coma, sin referencias) + distrito.
+function destinoGrifo(g) {
+  const calle = g.direccion.split(',')[0].replace(/\s+/g, ' ').trim();
+  return `${calle}, ${titulo(g.distrito)}, Lima, Perú`;
+}
+const enlaceMaps = (g) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(destinoGrifo(g))}`;
+const enlaceWaze = (g) => `https://waze.com/ul?q=${encodeURIComponent(destinoGrifo(g))}&navigate=yes`;
 const fechaPrecio = (g) => (g.dias === 0 ? 'precio de hoy' : g.dias === 1 ? 'precio de ayer' : `precio de hace ${g.dias} días`);
 
 function filaGrifo(g, referencia) {
@@ -583,7 +590,11 @@ function filaGrifo(g, referencia) {
       el('strong', { text: nombreGrifo(g) }),
       el('small', { class: 'gris', text: [g.nombre ? titulo(g.razon) : null, titulo(g.distrito), titulo(g.direccion)].filter(Boolean).join(' · ') }),
       el('small', { class: g.dias > 7 ? 'nota' : 'gris', text: fechaPrecio(g) })),
-    el('div', { class: 'precio' }, el('span', { class: 'monto', text: soles(g.precio) }), etiqueta ? el('span', { class: `chip ${tono}`, text: etiqueta }) : null));
+    el('div', { class: 'lado' },
+      el('div', { class: 'precio' }, el('span', { class: 'monto', text: soles(g.precio) }), etiqueta ? el('span', { class: `chip ${tono}`, text: etiqueta }) : null),
+      el('div', { class: 'ir' },
+        el('a', { href: enlaceWaze(g), target: '_blank', rel: 'noopener noreferrer', class: 'boton-ir waze', 'aria-label': `Ir a ${nombreGrifo(g)} con Waze`, text: 'Waze' }),
+        el('a', { href: enlaceMaps(g), target: '_blank', rel: 'noopener noreferrer', class: 'boton-ir', 'aria-label': `Ir a ${nombreGrifo(g)} con Google Maps`, text: 'Maps' }))));
 }
 
 function seccionGrifos() {
