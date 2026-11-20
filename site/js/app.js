@@ -183,13 +183,14 @@ function bloqueTemperatura() {
   const medidas = config.playas.map((p) => {
     const t = tempMar.playas?.[p.id];
     const normal = climaMar.playas?.[p.id]?.[t ? diaDelAnio(t.fecha) : 0];
-    return t && typeof normal === 'number' ? { actual: t.actual, normal, fecha: t.fecha } : null;
+    return t && typeof normal === 'number' ? { actual: t.actual, normal, fecha: t.fecha, fuente: t.fuente ?? 'oisst' } : null;
   }).filter(Boolean);
   if (!medidas.length) return null;
   const prom = (k) => medidas.reduce((s, m) => s + m[k], 0) / medidas.length;
   const actual = prom('actual');
   const normal = prom('normal');
   const dif = Math.round((actual - normal) * 10) / 10;
+  const diasAtraso = Math.floor((Date.now() - Date.parse(`${medidas[0].fecha}T12:00:00-05:00`)) / 864e5);
   const tono = dif >= 0.5 ? 'calido' : dif <= -0.5 ? 'frio' : 'normal';
   const titular = tono === 'normal'
     ? 'Dentro de lo habitual'
@@ -209,7 +210,8 @@ function bloqueTemperatura() {
     el('div', { class: 'escala', role: 'img', 'aria-label': `${titular}` }, marca),
     el('div', { class: 'escala-rotulos' }, el('span', { text: `−${limite} °C` }), el('span', { text: 'habitual' }), el('span', { text: `+${limite} °C` })),
     graficoHistorico(),
-    el('p', { class: 'gris pequeno', text: `Lectura satelital del ${fechaCorta(Date.parse(`${medidas[0].fecha}T12:00:00-05:00`))} (NOAA OISST, preliminar); habitual = promedio 1991–2020 de ese día. Es del mar abierto frente a la costa: en la orilla puede variar.` }));
+    el('p', { class: 'gris pequeno', text: `${medidas.every((m) => m.fuente === 'openmeteo') ? 'Dato del modelo Open-Meteo, usado porque NOAA no respondió' : 'Lectura satelital (NOAA OISST, preliminar)'} del ${fechaCorta(Date.parse(`${medidas[0].fecha}T12:00:00-05:00`))}; habitual = promedio 1991–2020 de ese día. Es del mar abierto frente a la costa: en la orilla puede variar.` }),
+    diasAtraso > 7 ? el('p', { class: 'nota', text: `Atención: el último dato de temperatura del mar tiene ${diasAtraso} días.` }) : null);
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
