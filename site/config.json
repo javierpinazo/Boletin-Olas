@@ -23,7 +23,8 @@
     "favoritos": [
       { "nombre": "Smile (Ate)", "codigo": "16723" },
       { "nombre": "Kio (Ate)", "codigo": "154354" },
-      { "nombre": "Kio (Panamericana Sur)", "codigo": "17952" }
+      { "nombre": "Kio (Panamericana Sur)", "codigo": "17952" },
+      { "nombre": "Gran Prix (Lince)", "codigo": "9080" }
     ],
     "zonas": [
       { "nombre": "La Molina y Javier Prado este", "distritos": ["La Molina"], "avenidas": ["Javier Prado"] },
