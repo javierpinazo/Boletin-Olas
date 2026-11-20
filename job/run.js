@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { construirDhn } from './construir-dhn.js';
 import { escribirTempMar } from './temp-mar.js';
+import { escribirGrifos } from './grifos.js';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DESTINO = path.join(RAIZ, 'data', 'dhn.json');
@@ -32,6 +33,7 @@ async function principal() {
   if (dhn.parseError) console.warn(`Aviso no entendido: ${dhn.avisoCrudo.motivo}`);
   const config = JSON.parse(fs.readFileSync(path.join(RAIZ, 'site', 'config.json'), 'utf8'));
   await escribirTempMar(config.playas, path.join(RAIZ, 'data', 'temp-mar.json'));
+  await escribirGrifos(config, path.join(RAIZ, 'data', 'grifos.json'));
 }
 
 principal().catch((e) => {

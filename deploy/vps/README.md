@@ -86,3 +86,10 @@ hay que leer, tarda ~15 s y la página la muestra sola al terminar.
 Instalación: `deploy/vps/boletin-olas-api.service` → `/etc/systemd/system/`, `systemctl enable --now boletin-olas-api`;
 el bloque `location = /api/actualizar` de `nginx-olaspaddle.duckdns.org.conf` va dentro del server HTTPS.
 Registro del cron: `/home/PayHub/boletin-olas-cron.log`.
+
+## Precios de grifos (2026-11-20)
+
+`job/grifos.js` baja el Excel público de Osinergmin "Últimos precios registrados en EVPC" (el registro que alimenta
+Facilito; Facilito en sí exige reCAPTCHA y no se lee) y escribe `data/grifos.json`. Corre junto con el DHN en `run.js`
+(cron de las 6 a. m. y actualización al abrir la página). Si falla, se conserva el archivo anterior. Los grifos favoritos,
+el combustible y los tramos de la ruta están en `site/config.json` (`grifos`).

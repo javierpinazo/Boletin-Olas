@@ -49,7 +49,7 @@ async function cargarJson(url) {
 
 const estado = {
   dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0, diaCargado: null,
-  actualizando: false, ultimoRefresco: 0, tempMar: null, climaMar: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
+  actualizando: false, ultimoRefresco: 0, tempMar: null, climaMar: null, grifos: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
 };
 
 async function iniciar() {
@@ -59,6 +59,7 @@ async function iniciar() {
   estado.dhn = await cargarJson('./data/dhn.json').catch(() => null);
   estado.tempMar = await cargarJson('./data/temp-mar.json').catch(() => null);
   estado.climaMar = await cargarJson('./clima-mar.json').catch(() => null);
+  estado.grifos = await cargarJson('./data/grifos.json').catch(() => null);
   const resultados = await Promise.allSettled(estado.config.playas.map((p) => cargarMar(p)));
   estado.mar = resultados.map((r) => (r.status === 'fulfilled' ? r.value : null));
   estado.salidas = leerSalidas(almacen());
@@ -80,6 +81,7 @@ async function refrescar() {
     if (r.ok && (await r.json()).actualizado) {
       estado.dhn = await cargarJson('./data/dhn.json').catch(() => estado.dhn);
       estado.tempMar = await cargarJson('./data/temp-mar.json').catch(() => estado.tempMar);
+      estado.grifos = await cargarJson('./data/grifos.json').catch(() => estado.grifos);
       estado.ahoraMs = Date.now();
     }
   } catch {
@@ -267,6 +269,7 @@ function pintar() {
     mejorOpcion(resultados),
     ...resultados.map((r) => tarjeta(r, oleaje)),
     panelSalidas(),
+    seccionGrifos(),
     pie(tsun),
   ];
   raiz.replaceChildren(...piezas.filter(Boolean));
@@ -560,6 +563,48 @@ function panelSalidas() {
     el('p', { class: 'gris', text: `${estado.salidas.length} registradas en este navegador. Exporta de vez en cuando: si borras los datos del sitio se pierden.` }),
     el('p', {}, exportar, importar),
     estado.mensajeSalidas ? el('p', { class: 'nota', role: 'status', text: estado.mensajeSalidas }) : null);
+}
+
+// ---------- Grifos: precio del combustible (Osinergmin, el registro que alimenta Facilito) ----------
+const soles = (n) => `S/ ${(Math.round(n * 100) / 100).toFixed(2).replace('.', ',')}`;
+const titulo = (t) => t.toLowerCase().replace(/(^|\s)\S/g, (m) => m.toUpperCase());
+const nombreGrifo = (g) => g.nombre ?? titulo(g.razon);
+const fechaPrecio = (g) => (g.dias === 0 ? 'precio de hoy' : g.dias === 1 ? 'precio de ayer' : `precio de hace ${g.dias} días`);
+
+function filaGrifo(g, referencia) {
+  if (g.sinPrecio) {
+    return el('li', { class: 'grifo' }, el('div', { class: 'datos' }, el('strong', { text: nombreGrifo(g) }), el('small', { class: 'gris', text: 'Sin precio vigente en el registro' })));
+  }
+  const dif = referencia === null ? null : Math.round((g.precio - referencia) * 100) / 100;
+  const etiqueta = dif === null ? null : dif <= 0.005 ? 'el más barato' : `+${soles(dif)}`;
+  const tono = dif === null ? 'gris' : dif <= 0.005 ? 'verde' : dif <= 0.5 ? 'amarillo' : 'rojo';
+  return el('li', { class: 'grifo' },
+    el('div', { class: 'datos' },
+      el('strong', { text: nombreGrifo(g) }),
+      el('small', { class: 'gris', text: [g.nombre ? titulo(g.razon) : null, titulo(g.distrito), titulo(g.direccion)].filter(Boolean).join(' · ') }),
+      el('small', { class: g.dias > 7 ? 'nota' : 'gris', text: fechaPrecio(g) })),
+    el('div', { class: 'precio' }, el('span', { class: 'monto', text: soles(g.precio) }), etiqueta ? el('span', { class: `chip ${tono}`, text: etiqueta }) : null));
+}
+
+function seccionGrifos() {
+  const { grifos } = estado;
+  if (!grifos) return null;
+  const candidatos = [...grifos.favoritos.filter((g) => !g.sinPrecio), ...grifos.zonas.flatMap((z) => z.grifos)];
+  const referencia = candidatos.length ? Math.min(...candidatos.map((g) => g.precio)) : null;
+  const generado = Date.parse(grifos.generadoEn);
+  return el('section', { class: 'grifos' },
+    el('h2', { text: `Combustible · ${grifos.producto}` }),
+    referencia !== null ? el('p', { class: 'resumen', text: `El más barato de tus opciones: ${soles(referencia)} por ${grifos.unidad}. Mediana en Lima: ${soles(grifos.medianaLima)}.` }) : null,
+    el('h3', { text: 'Tus grifos' }),
+    el('ul', {}, grifos.favoritos.map((g) => filaGrifo(g, referencia))),
+    el('h3', { text: 'Más baratos en tu ruta' }),
+    grifos.zonas.map((z) => el('div', { class: 'zona' },
+      el('p', { class: 'zona-nombre', text: z.nombre }),
+      z.grifos.length ? el('ul', {}, z.grifos.map((g) => filaGrifo(g, referencia))) : el('p', { class: 'gris pequeno', text: 'Sin precios recientes en este tramo.' }))),
+    el('h3', { text: 'Los más baratos de Lima' }),
+    el('ul', {}, grifos.lima.map((g) => filaGrifo(g, referencia))),
+    el('p', { class: 'gris pequeno', text: `Precio por ${grifos.unidad}, declarado por cada grifo a Osinergmin (la fuente de Facilito). Mira el cartel del surtidor antes de cargar. Leído el ${fechaCorta(generado)} ${horaCorta(generado)}.` }),
+    el('p', { class: 'gris pequeno' }, el('a', { href: 'https://www.facilito.gob.pe/facilito/', text: 'Abrir Facilito', rel: 'noopener' })));
 }
 
 function pie(tsun) {

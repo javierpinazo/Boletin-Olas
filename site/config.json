@@ -14,6 +14,24 @@
     "horasMaxDhn": 3
   },
   "ventana": { "horaInicio": 6, "horaFin": 17 },
+  "grifos": {
+    "producto": "GASOHOL PREMIUM",
+    "etiqueta": "Gasohol premium",
+    "maximoDiasPrecio": 30,
+    "cuantosPorZona": 2,
+    "cuantosLima": 3,
+    "favoritos": [
+      { "nombre": "Smile (Ate)", "codigo": "16723" },
+      { "nombre": "Kio (Ate)", "codigo": "154354" },
+      { "nombre": "Kio (Panamericana Sur)", "codigo": "17952" }
+    ],
+    "zonas": [
+      { "nombre": "La Molina y Javier Prado este", "distritos": ["La Molina"], "avenidas": ["Javier Prado"] },
+      { "nombre": "Estadio Nacional, Jesús María y Lince", "distritos": ["Jesús María", "Lince", "San Isidro"], "avenidas": ["Paseo de la República", "José Díaz", "Arenales"] },
+      { "nombre": "San Borja y Clínica Internacional", "distritos": ["San Borja", "Surquillo"], "avenidas": ["Guardia Civil", "Aviación"] },
+      { "nombre": "Panamericana Sur", "distritos": ["Santiago de Surco", "Chorrillos", "Villa El Salvador", "Lurín"], "avenidas": ["Panamericana Sur"] }
+    ]
+  },
   "playas": [
     { "id": "yuyos", "nombre": "Yuyos", "lat": -12.149, "lon": -77.026, "orientacion": 225, "factorOla": 0.31 },
     { "id": "la-punta", "nombre": "La Punta", "lat": -12.071, "lon": -77.164, "orientacion": 15, "factorOla": 0.31, "latTramo": -12.05 },
