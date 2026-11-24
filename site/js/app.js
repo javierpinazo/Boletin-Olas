@@ -355,7 +355,7 @@ function mejorOpcion(resultados) {
     return el('section', { class: 'mejor ninguna' }, el('h2', { text: 'No pude obtener el mar ahora' }), el('p', { text: 'No hay semáforo sin datos de oleaje y viento. Reintenta en unos minutos.' }));
   }
   if (dia.tipo === 'sin-horas') {
-    return el('section', { class: 'mejor sin-horas' }, el('h2', { text: 'Ya no quedan horas suficientes hoy' }), el('p', { text: 'La ventana de remo es de 6 a 17 h y hacen falta al menos 2 horas seguidas. Mira Mañana.' }));
+    return el('section', { class: 'mejor sin-horas' }, el('h2', { text: 'Ya no quedan horas suficientes hoy' }), el('p', { text: 'La ventana de remo es de 6 a 17 h y hacen falta al menos 2 horas seguidas. Mira Mañana. Abajo ves cómo estuvo el mar hoy.' }));
   }
   if (dia.tipo === 'ninguna') {
     // Sin bloque apto no se "juzga": se describe el mar con la escala de colores y se explica la causa.
@@ -464,7 +464,8 @@ function tarjeta(r, oleaje) {
     el('span', { class: 'nombre', text: r.playa.nombre }, nivelDePlaya(r.playa, oleaje)),
     chipDePlaya(r));
   const resumen = el('summary', { text: 'Detalle por hora y registro' });
-  const filas = r.horas.map((h) => el('tr', { class: h.color },
+  const horasTabla = r.horas.length ? r.horas : r.horasDia;
+  const filas = horasTabla.map((h) => el('tr', { class: h.color },
     el('td', { text: `${String(Number(h.hora.slice(11, 13)))} h` }),
     el('td', {},
       h.dato.hs === null ? '—' : `${num1(h.dato.hs)} m`,
@@ -482,7 +483,7 @@ function tarjeta(r, oleaje) {
     notaExposicion(r),
     ...r.notas.map((n) => el('p', { class: 'nota', text: n })),
     lineaMareas(r),
-    r.horas.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Hora', 'Ola', 'Periodo', 'Viento', 'Estado / motivo'].map((t) => el('th', { text: t })))), el('tbody', {}, filas)) : null,
+    horasTabla.length ? el('table', {}, el('thead', {}, el('tr', {}, ['Hora', 'Ola', 'Periodo', 'Viento', 'Estado / motivo'].map((t) => el('th', { text: t })))), el('tbody', {}, filas)) : null,
     bloqueRegistro(r));
   detalles.addEventListener('toggle', () => {
     if (detalles.open) estado.abiertas.add(r.playa.id);
@@ -509,11 +510,14 @@ function climaDelDia(horasDia) {
 function panelGrafico(r) {
   const { config } = estado;
   const u = config.umbrales;
-  const datos = r.horas.filter((h) => typeof h.dato.hs === 'number');
+  // Cuando ya pasó la ventana de remo no quedan horas por evaluar: se muestran las condiciones de todo el día.
+  const terminado = r.horas.length === 0 && r.horasDia.length > 0;
+  const base = terminado ? r.horasDia : r.horas;
+  const datos = base.filter((h) => typeof h.dato.hs === 'number');
   if (!datos.length) return null;
   const hsMedia = datos.reduce((s, h) => s + h.dato.hs, 0) / datos.length;
-  const vientoMax = Math.max(...r.horas.map((h) => h.dato.vientoKmh ?? 0));
-  const rafagaMax = Math.max(...r.horas.map((h) => h.dato.rafagaKmh ?? h.dato.vientoKmh ?? 0));
+  const vientoMax = Math.max(...base.map((h) => h.dato.vientoKmh ?? 0));
+  const rafagaMax = Math.max(...base.map((h) => h.dato.rafagaKmh ?? h.dato.vientoKmh ?? 0));
   const grado = gradoMar(hsMedia, u);
   const cifra = (valor, unidad, etiqueta, color) => el('div', { class: `cifra ${color}` },
     el('span', { class: 'valor' }, valor, el('small', { text: ` ${unidad}` })),
@@ -534,7 +538,7 @@ function panelGrafico(r) {
   const fila = (titulo, celda) => el('div', { class: 'fila-graf' },
     el('span', { class: 'rotulo', text: titulo }),
     el('div', { class: 'columnas' }, horas.map((h) => celda(h, porHora.get(h)))));
-  const pasada = (d) => (estado.dia === 0 && d && d.hora.slice(0, 13) < ahoraH ? ' pasada' : '');
+  const pasada = (d) => (estado.dia === 0 && !terminado && d && d.hora.slice(0, 13) < ahoraH ? ' pasada' : '');
   const semaforo = fila('Apto', (h, d) => el('span', { class: `celda ${d ? d.color : 'gris'}${pasada(d)}`, title: d ? motivoHora(d) || 'Verde' : 'Sin datos' }));
   const olas = fila('Ola (m)', (h, d) => el('span', { class: 'col' },
     d && typeof d.dato.hs === 'number'
@@ -554,7 +558,8 @@ function panelGrafico(r) {
   const horasEtiqueta = el('div', { class: 'fila-graf' },
     el('span', { class: 'rotulo' }),
     el('div', { class: 'columnas horas' }, horas.map((h) => el('span', { text: h % 2 === 0 ? String(h) : '' }))));
-  const leyenda = estado.dia === 0 ? el('p', { class: 'gris pequeno', text: 'Las horas ya pasadas aparecen atenuadas.' }) : null;
+  const leyenda = terminado ? el('p', { class: 'gris pequeno', text: 'La ventana de remo de hoy ya terminó: así estuvo el mar durante el día.' })
+    : estado.dia === 0 ? el('p', { class: 'gris pequeno', text: 'Las horas ya pasadas aparecen atenuadas.' }) : null;
   return el('div', { class: 'grafico' }, cifras, cifrasClima, semaforo, olas, viento, clima ? sol : null, horasEtiqueta, leyenda);
 }
 

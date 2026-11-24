@@ -233,3 +233,6 @@ footer p { margin: 6px 0; }
 .luna-marea { margin: 2px 0 0; font-size: .85rem; font-weight: 600; }
 .luna-marea.viva { color: var(--acento); }
 .luna .pequeno { margin: 4px 0 0; }
+
+.firma { text-align: center; color: var(--suave); font-size: .8rem; padding: 4px 0 24px; }
+.firma a { color: inherit; }
