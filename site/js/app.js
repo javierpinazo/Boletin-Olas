@@ -7,6 +7,7 @@ import {
   IMPRESIONES, IMPRESIONES_VIENTO, nuevaSalida, agregarSalida, factorAprendido, factorVientoAprendido, fusionar,
   hsBaseDelDia, vientoBaseDelDia, leerSalidas, guardarSalidas,
 } from './salidas.js';
+import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, proximas, trazoLuz } from './luna.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -262,6 +263,7 @@ function pintar() {
   const raiz = document.getElementById('app');
   const piezas = [
     bannerTsunami(tsun),
+    barraLuna(),
     bannerActualizando(),
     bannerDhn(),
     bannerOleaje(resultados),
@@ -275,6 +277,30 @@ function pintar() {
     pie(tsun),
   ];
   raiz.replaceChildren(...piezas.filter(Boolean));
+}
+
+// ---------- Fases de la Luna (calculadas en el navegador; son informativas, no entran al semáforo) ----------
+function discoLuna(p, r = 14) {
+  const trazo = trazoLuz(p, r - 1);
+  return svg('svg', { viewBox: `${-r} ${-r} ${r * 2} ${r * 2}`, class: 'disco-luna', 'aria-hidden': 'true' },
+    svg('circle', { cx: 0, cy: 0, r: r - 1, class: 'oscuro' }),
+    trazo ? svg('path', { d: trazo, class: 'luz' }) : null);
+}
+
+function barraLuna() {
+  const ms = Date.parse(`${fechaDelDia(estado.dia)}T12:00:00-05:00`);
+  const p = posicionCiclo(ms);
+  const actual = indiceFase(p);
+  const marea = tipoMarea(p);
+  const sig = proximas(ms);
+  const dia = (x) => fechaCorta(x);
+  return el('section', { class: 'luna', 'aria-label': 'Fase de la Luna' },
+    el('ul', { class: 'fases' }, FASES.map((nombre, i) => el('li', { class: i === actual ? 'fase actual' : 'fase', title: nombre, 'aria-current': i === actual ? 'true' : 'false' },
+      discoLuna(i / 8),
+      i === actual ? el('span', { class: 'flecha', 'aria-hidden': 'true', text: '▲' }) : null))),
+    el('p', { class: 'luna-titular' }, el('strong', { text: FASES[actual] }), el('span', { class: 'gris', text: ` · ${Math.round(iluminacion(p) * 100)} % iluminada` })),
+    el('p', { class: `luna-marea ${marea.tipo}`, text: marea.texto }),
+    el('p', { class: 'gris pequeno', text: `Próxima luna nueva: ${dia(sig.nueva)} · próxima luna llena: ${dia(sig.llena)} · Cálculo aproximado; no cambia el semáforo.` }));
 }
 
 function bannerTsunami(tsun) {

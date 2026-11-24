@@ -219,3 +219,17 @@ footer p { margin: 6px 0; }
 .boton-ir { display: block; min-width: 56px; text-align: center; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--acento); color: var(--acento); font-size: .78rem; font-weight: 600; text-decoration: none; }
 .boton-ir.waze { background: var(--acento); color: #fff; }
 .boton-ir:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+
+/* ---------- Luna ---------- */
+.luna { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 14px; }
+.fases { list-style: none; margin: 0; padding: 0; display: flex; justify-content: space-between; gap: 4px; }
+.fase { position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 2px 14px; border-radius: 10px; flex: 1; opacity: .55; }
+.fase.actual { opacity: 1; background: color-mix(in srgb, var(--acento) 14%, transparent); box-shadow: inset 0 0 0 2px var(--acento); }
+.disco-luna { width: 30px; height: 30px; display: block; }
+.disco-luna .oscuro { fill: #2b3440; stroke: var(--borde); stroke-width: .6; }
+.disco-luna .luz { fill: #f3e9b8; }
+.fase .flecha { position: absolute; bottom: 1px; font-size: .6rem; color: var(--acento); line-height: 1; }
+.luna-titular { margin: 4px 0 0; font-size: 1rem; }
+.luna-marea { margin: 2px 0 0; font-size: .85rem; font-weight: 600; }
+.luna-marea.viva { color: var(--acento); }
+.luna .pequeno { margin: 4px 0 0; }
