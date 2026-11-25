@@ -10,6 +10,9 @@ import { tramoParaPlaya } from '../site/js/score.js';
 
 const items = separarItems(fs.readFileSync(new URL('./fixtures/avisos-2026.html', import.meta.url), 'utf8'));
 const config = JSON.parse(fs.readFileSync(new URL('../site/config.json', import.meta.url), 'utf8'));
+const catalogo = JSON.parse(fs.readFileSync(new URL('../site/playas.json', import.meta.url), 'utf8'));
+// Las 4 originales (las que traen factor calibrado).
+config.playas = catalogo.playas.filter((p) => ['yuyos', 'la-punta', 'punta-hermosa', 'san-bartolo'].includes(p.id));
 
 function leerTodos() {
   const leidos = [];

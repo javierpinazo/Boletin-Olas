@@ -3,11 +3,13 @@
 import fs from 'node:fs';
 import { cargarMar, horasDelDia } from '../site/js/mar.js';
 
-const config = JSON.parse(fs.readFileSync(new URL('../site/config.json', import.meta.url), 'utf8'));
+const catalogo = JSON.parse(fs.readFileSync(new URL('../site/playas.json', import.meta.url), 'utf8'));
+// npm run valores -- [id...]  (sin ids, las 4 originales)
+const ids = process.argv.slice(2).length ? process.argv.slice(2) : ['yuyos', 'la-punta', 'punta-hermosa', 'san-bartolo'];
 const ahora = Date.now();
 const fecha = new Date(ahora - 5 * 3600 * 1000).toISOString().slice(0, 10);
 
-for (const playa of config.playas) {
+for (const playa of catalogo.playas.filter((p) => ids.includes(p.id))) {
   const horas = await cargarMar(playa);
   const dia = horasDelDia(horas, fecha, { horaInicio: 0, horaFin: 24 }, 0);
   console.log(`\n${playa.nombre} (${fecha})`);

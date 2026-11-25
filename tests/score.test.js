@@ -12,6 +12,9 @@ import {
 
 const FX = new URL('./fixtures/', import.meta.url);
 const config = JSON.parse(fs.readFileSync(new URL('../site/config.json', import.meta.url), 'utf8'));
+const catalogo = JSON.parse(fs.readFileSync(new URL('../site/playas.json', import.meta.url), 'utf8'));
+// Las 4 originales (las que traen factor calibrado).
+config.playas = catalogo.playas.filter((p) => ['yuyos', 'la-punta', 'punta-hermosa', 'san-bartolo'].includes(p.id));
 const u = config.umbrales;
 // Los tests de umbrales usan la ola del modelo tal cual (factor 1); el factor real se prueba aparte.
 const playa = (id) => ({ ...config.playas.find((p) => p.id === id), factorOla: 1 });
@@ -455,8 +458,9 @@ test('factorOla: la ola corregida también baja el rojo por periodo largo a amar
 });
 
 test('config: cada playa trae un factorOla razonable (0 < f <= 1,5)', () => {
-  for (const p of config.playas) {
-    assert.ok(typeof p.factorOla === 'number' && p.factorOla > 0 && p.factorOla <= 1.5, `${p.nombre}: factorOla=${p.factorOla}`);
+  for (const p of catalogo.playas) {
+    const f = p.factorOla ?? 1;
+    assert.ok(typeof f === 'number' && f > 0 && f <= 1.5, `${p.nombre}: factorOla=${f}`);
   }
 });
 
@@ -540,7 +544,7 @@ test('motivoHora: vacío si es verde; si no, la(s) razón(es) del peor color', (
 // ---------- Config: orientación y Yuyos en Barranco ----------
 
 test('config: cada playa trae una orientación entre 0 y 359°', () => {
-  for (const p of config.playas) assert.ok(Number.isFinite(p.orientacion) && p.orientacion >= 0 && p.orientacion < 360, p.nombre);
+  for (const p of catalogo.playas) assert.ok(Number.isFinite(p.orientacion) && p.orientacion >= 0 && p.orientacion < 360, p.nombre);
 });
 
 test('config: Yuyos es Los Yuyos de Barranco (Costa Verde)', () => {
@@ -663,7 +667,7 @@ test('factorViento y factorOla se aplican a la vez sin pisarse', () => {
 });
 
 test('config: factorViento es opcional pero, si está, razonable (0 < f <= 1,5)', () => {
-  for (const p of config.playas) {
+  for (const p of catalogo.playas) {
     assert.ok(p.factorViento === undefined || (typeof p.factorViento === 'number' && p.factorViento > 0 && p.factorViento <= 1.5), p.nombre);
   }
 });
