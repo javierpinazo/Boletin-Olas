@@ -265,7 +265,7 @@ function pintar() {
   const oceano = esOceano();
   const fecha = document.getElementById('fecha-hoy');
   if (fecha) fecha.textContent = fmt(estado.ahoraMs, { weekday: 'long', day: 'numeric', month: 'long' });
-  // En modo océano el orden lo pone el CSS (order); aquí solo se agregan sus piezas propias.
+  // Mismo orden en los dos temas; el océano solo agrega sus piezas propias después de las playas.
   const mejorId = oceano ? estadoDia(resultados).mejor?.playa.id : null;
   const piezas = [
     bannerTsunami(tsun),

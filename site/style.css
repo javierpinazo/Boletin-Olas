@@ -297,21 +297,8 @@ footer p { margin: 6px 0; }
 :root[data-tema="oceano"] .boton-tema .icono-sol { display: block; }
 :root[data-tema="oceano"] main { margin-top: 4px; gap: 14px; }
 
-/* Orden de secciones del modo océano (main es una grilla) */
-:root[data-tema="oceano"] main > .banner, :root[data-tema="oceano"] main > p { order: -20; }
-:root[data-tema="oceano"] .dias { order: -10; }
-:root[data-tema="oceano"] .titular-oceano { order: 10; }
-:root[data-tema="oceano"] .playa { order: 30; }
-:root[data-tema="oceano"] .playa.destacada { order: 20; }
-:root[data-tema="oceano"] .cuadro-horas { order: 40; }
-:root[data-tema="oceano"] .oleaje { order: 45; }
-:root[data-tema="oceano"] .temperatura { order: 50; }
-:root[data-tema="oceano"] .luna { order: 60; }
-:root[data-tema="oceano"] .compartir { order: 70; }
-:root[data-tema="oceano"] .instalar { order: 80; }
-:root[data-tema="oceano"] .salidas { order: 90; }
-:root[data-tema="oceano"] .grifos { order: 95; }
-:root[data-tema="oceano"] main > footer { order: 100; }
+/* Orden de secciones: el mismo que el clásico (luna, días, oleaje, temperatura, titular, playas…);
+   las piezas propias del océano (cuadro hora a hora, compartir, instalar) van después de las playas. */
 
 /* Tarjetas */
 :root[data-tema="oceano"] .playa, :root[data-tema="oceano"] .oleaje, :root[data-tema="oceano"] .temperatura,
