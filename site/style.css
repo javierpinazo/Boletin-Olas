@@ -223,9 +223,9 @@ footer p { margin: 6px 0; }
 /* ---------- Luna ---------- */
 .luna { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 10px 14px; }
 .fases { list-style: none; margin: 0; padding: 0; display: flex; justify-content: space-between; gap: 4px; }
-.fase { position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 2px 14px; border-radius: 10px; flex: 1; opacity: .55; }
+.fase { position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 2px 14px; border-radius: 10px; flex: 1; min-width: 0; opacity: .55; }
 .fase.actual { opacity: 1; background: color-mix(in srgb, var(--acento) 14%, transparent); box-shadow: inset 0 0 0 2px var(--acento); }
-.disco-luna { width: 30px; height: 30px; display: block; }
+.disco-luna { width: 100%; max-width: 30px; height: auto; aspect-ratio: 1; display: block; }
 .disco-luna .oscuro { fill: #2b3440; stroke: var(--borde); stroke-width: .6; }
 .disco-luna .luz { fill: #f3e9b8; }
 .fase .flecha { position: absolute; bottom: 1px; font-size: .6rem; color: var(--acento); line-height: 1; }
@@ -236,3 +236,175 @@ footer p { margin: 6px 0; }
 
 .firma { text-align: center; color: var(--suave); font-size: .8rem; padding: 4px 0 24px; }
 .firma a { color: inherit; }
+
+/* ---------- Cabecera y botón de tema (ambos temas) ---------- */
+.cabecera-sitio { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.cabecera-sitio .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.solo-oceano { display: none; }
+.boton-tema {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
+  border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--acento); cursor: pointer; padding: 0;
+}
+.boton-tema:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+.boton-tema .icono-sol { display: none; }
+
+/* =====================================================================
+   Tema "Modo océano" (oscuro). Todo va bajo :root[data-tema="oceano"]: el tema clásico no cambia.
+   ===================================================================== */
+:root[data-tema="oceano"] {
+  --fondo: #08131c;
+  --tarjeta: #12293b;
+  --caja: #0b1e2c;
+  --texto: #e8f1f8;
+  --suave: #a9c2d6;
+  --borde: #1f4058;
+  --acento: #7cc4ff;
+  --verde: #8fe0b4;
+  --verde-fondo: #1f5e3c;
+  --amarillo: #ffe7b3;
+  --amarillo-fondo: #5a4212;
+  --rojo: #ffd0c8;
+  --rojo-fondo: #5a1f18;
+  --naranja: #ffd9c2;
+  --naranja-fondo: #5a2a12;
+  --c-verde: #3fb27a;
+  --c-ambar: #e0a83a;
+  --c-rojo: #e0614f;
+  color-scheme: dark;
+}
+:root[data-tema="oceano"] body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+:root[data-tema="oceano"] h1, :root[data-tema="oceano"] h2, :root[data-tema="oceano"] h3,
+:root[data-tema="oceano"] .playa .cabecera .nombre, :root[data-tema="oceano"] .cifra .valor,
+:root[data-tema="oceano"] .temp-cifras .grande {
+  font-family: "Space Grotesk", Inter, system-ui, sans-serif; font-weight: 700;
+}
+
+/* Cabecera azul con ola que se funde con el fondo */
+:root[data-tema="oceano"] .solo-oceano { display: block; }
+:root[data-tema="oceano"] .cabecera-sitio {
+  position: relative; max-width: none; background: #0e4f7a; color: #ffffff;
+  padding: 22px max(16px, calc((100% - 608px) / 2)) 52px;
+}
+:root[data-tema="oceano"] .cabecera-sitio h1 { font-size: 1.5rem; letter-spacing: -.01em; }
+:root[data-tema="oceano"] .cabecera-sitio p { color: #c6dcec; }
+:root[data-tema="oceano"] .fecha-hoy { font-weight: 600; color: #ffffff; }
+:root[data-tema="oceano"] .fecha-hoy::first-letter { text-transform: uppercase; }
+:root[data-tema="oceano"] .logo { flex: 0 0 auto; }
+:root[data-tema="oceano"] .ola-borde { position: absolute; left: 0; bottom: -1px; width: 100%; height: 34px; fill: var(--fondo); }
+:root[data-tema="oceano"] .boton-tema { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .35); color: #ffffff; position: relative; z-index: 1; }
+:root[data-tema="oceano"] .boton-tema:focus-visible { outline-color: #ffffff; }
+:root[data-tema="oceano"] .boton-tema .icono-ola { display: none; }
+:root[data-tema="oceano"] .boton-tema .icono-sol { display: block; }
+:root[data-tema="oceano"] main { margin-top: 4px; gap: 14px; }
+
+/* Orden de secciones del modo océano (main es una grilla) */
+:root[data-tema="oceano"] main > .banner, :root[data-tema="oceano"] main > p { order: -20; }
+:root[data-tema="oceano"] .dias { order: -10; }
+:root[data-tema="oceano"] .titular-oceano { order: 10; }
+:root[data-tema="oceano"] .playa { order: 30; }
+:root[data-tema="oceano"] .playa.destacada { order: 20; }
+:root[data-tema="oceano"] .cuadro-horas { order: 40; }
+:root[data-tema="oceano"] .oleaje { order: 45; }
+:root[data-tema="oceano"] .temperatura { order: 50; }
+:root[data-tema="oceano"] .luna { order: 60; }
+:root[data-tema="oceano"] .compartir { order: 70; }
+:root[data-tema="oceano"] .instalar { order: 80; }
+:root[data-tema="oceano"] .salidas { order: 90; }
+:root[data-tema="oceano"] .grifos { order: 95; }
+:root[data-tema="oceano"] main > footer { order: 100; }
+
+/* Tarjetas */
+:root[data-tema="oceano"] .playa, :root[data-tema="oceano"] .oleaje, :root[data-tema="oceano"] .temperatura,
+:root[data-tema="oceano"] .luna, :root[data-tema="oceano"] .salidas, :root[data-tema="oceano"] .grifos,
+:root[data-tema="oceano"] .cuadro-horas, :root[data-tema="oceano"] .instalar {
+  background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 20px;
+}
+:root[data-tema="oceano"] .playa { padding: 0 18px; }
+:root[data-tema="oceano"] .playa.destacada { border-color: #2f6a8f; }
+:root[data-tema="oceano"] .playa.destacada .cabecera .nombre { font-size: 1.4rem; }
+:root[data-tema="oceano"] .dias button { border-radius: 12px; min-height: 44px; }
+:root[data-tema="oceano"] .dias button[aria-pressed="true"],
+:root[data-tema="oceano"] .registro button[aria-pressed="true"],
+:root[data-tema="oceano"] .boton-ir.waze { color: #08131c; }
+
+/* 1) Titular */
+:root[data-tema="oceano"] .titular-oceano { background: none; border: 0; padding: 6px 2px 0; }
+:root[data-tema="oceano"] .titular-oceano .sobre { margin: 0 0 4px; font-size: .85rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8fe0b4; }
+:root[data-tema="oceano"] .titular-oceano.cuidado .sobre { color: #ffe7b3; }
+:root[data-tema="oceano"] .titular-oceano h2 { margin: 0; font-size: 2.1rem; line-height: 1.08; color: var(--texto); }
+:root[data-tema="oceano"] .titular-oceano.mejor h2 { font-size: 1.6rem; }
+:root[data-tema="oceano"] .titular-oceano.mejor.rojo h2, :root[data-tema="oceano"] .titular-oceano.mejor.ninguna h2 { color: #ffd0c8; }
+:root[data-tema="oceano"] .titular-oceano.mejor.naranja h2 { color: #ffd9c2; }
+:root[data-tema="oceano"] .titular-oceano.mejor.amarillo h2 { color: #ffe7b3; }
+:root[data-tema="oceano"] .titular-oceano.mejor p { color: var(--suave); }
+
+/* 2–3) Playas: etiquetas, cifras con icono y barras */
+:root[data-tema="oceano"] .chip.verde { background: #1f5e3c; color: #d9f5e3; }
+:root[data-tema="oceano"] .chip.amarillo, :root[data-tema="oceano"] .chip.naranja { background: #5a4212; color: #ffe7b3; }
+:root[data-tema="oceano"] .chip.rojo { background: #5a1f18; color: #ffd0c8; }
+:root[data-tema="oceano"] .chip.gris { background: var(--caja); color: var(--suave); }
+:root[data-tema="oceano"] .cifra { background: var(--caja); color: var(--texto); border-radius: 14px; padding: 10px 8px; }
+:root[data-tema="oceano"] .cifra .etiqueta { color: var(--suave); }
+:root[data-tema="oceano"] .cifra.verde .valor { color: #8fe0b4; }
+:root[data-tema="oceano"] .cifra.amarillo .valor { color: #ffe7b3; }
+:root[data-tema="oceano"] .cifra.naranja .valor { color: #ffd9c2; }
+:root[data-tema="oceano"] .cifra.rojo .valor { color: #ffd0c8; }
+:root[data-tema="oceano"] .cifra.sol { background: var(--caja); color: #ffe7b3; }
+:root[data-tema="oceano"] .cifra.neutro { background: var(--caja); color: var(--texto); }
+:root[data-tema="oceano"] .cifras:not(.clima) .cifra { padding-top: 38px; background-repeat: no-repeat; background-position: center 10px; background-size: 22px 22px; }
+:root[data-tema="oceano"] .cifras:not(.clima) .cifra:nth-child(1) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237cc4ff' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M2 12c2-2 4-2 6 0s4 2 6 0 4-2 6 0M2 17c2-2 4-2 6 0s4 2 6 0 4-2 6 0'/%3E%3C/svg%3E"); }
+:root[data-tema="oceano"] .cifras:not(.clima) .cifra:nth-child(2) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237cc4ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h7'/%3E%3C/svg%3E"); }
+:root[data-tema="oceano"] .cifras:not(.clima) .cifra:nth-child(3) { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237cc4ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2 4 14h7l-1 8 9-12h-7l1-8z'/%3E%3C/svg%3E"); }
+:root[data-tema="oceano"] .columnas .verde { background: var(--c-verde); }
+:root[data-tema="oceano"] .columnas .amarillo, :root[data-tema="oceano"] .columnas .naranja { background: var(--c-ambar); }
+:root[data-tema="oceano"] .columnas .rojo { background: var(--c-rojo); }
+:root[data-tema="oceano"] .columnas .celda { border-radius: 5px; }
+
+/* 4) Cuadro hora a hora (solo se pinta en modo océano) */
+.cuadro-horas { padding: 14px 14px 12px; }
+.cuadro-horas h2, .compartir h2 { margin: 0 0 10px; font-size: 1.15rem; }
+.cuadro { display: grid; gap: 4px; }
+.cuadro-fila { display: grid; grid-template-columns: 78px; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; align-items: center; }
+.cuadro-fila.cabeza span { font-size: .68rem; color: var(--suave); text-align: center; }
+.cuadro-nombre { font-size: .8rem; font-weight: 600; line-height: 1.15; }
+.cuadro-celda { display: block; height: 30px; border-radius: 5px; background: var(--borde); }
+.cuadro-celda.verde { background: var(--c-verde); }
+.cuadro-celda.amarillo, .cuadro-celda.naranja { background: var(--c-ambar); }
+.cuadro-celda.rojo { background: var(--c-rojo); }
+.cuadro-leyendas { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 0; font-size: .78rem; color: var(--suave); }
+.cuadro-leyenda { display: inline-flex; align-items: center; gap: 6px; }
+.cuadro-leyenda .cuadro-celda { width: 12px; height: 12px; border-radius: 3px; }
+
+/* 5) Temperatura con etiqueta de anomalía */
+:root[data-tema="oceano"] .temperatura .titular { display: table; margin: 12px auto 10px; padding: 6px 14px; border-radius: 12px; font-size: 1rem; }
+:root[data-tema="oceano"] .temperatura.calido .titular { background: #5a2a12; color: #ffd9c2; }
+:root[data-tema="oceano"] .temperatura.frio .titular { background: #10395a; color: #cfe8ff; }
+:root[data-tema="oceano"] .temperatura.normal .titular { background: #1f5e3c; color: #d9f5e3; }
+:root[data-tema="oceano"] .temperatura.calido .dif { color: #ffd9c2; }
+
+/* 6) Luna */
+:root[data-tema="oceano"] .luna { padding: 12px 14px; }
+
+/* 7) Comparte el día */
+.compartir { background: #0e4f7a; color: #ffffff; border-radius: 20px; padding: 16px; }
+.compartir h2 { margin-bottom: 2px; }
+.compartir-sub { margin: 0 0 12px; color: #c6dcec; font-size: .9rem; }
+.tarjeta-compartir { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto 14px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.compartir-botones { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.boton-oceano {
+  display: flex; align-items: center; justify-content: center; min-height: 48px; border-radius: 14px; font: inherit; font-weight: 600;
+  font-size: .95rem; text-decoration: none; cursor: pointer;
+}
+.boton-oceano.verde { background: #1f5e3c; color: #ffffff; border: 0; }
+.boton-oceano.borde { background: transparent; color: #ffffff; border: 1px solid #c6dcec; }
+.boton-oceano:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+
+/* 8) Instalar */
+.instalar { padding: 14px 16px; }
+.instalar-fila { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.instalar-texto { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.instalar-texto span { font-size: .85rem; color: var(--suave); }
+.boton-instalar { flex: 0 0 auto; min-height: 44px; padding: 0 18px; border-radius: 12px; border: 0; background: #7cc4ff; color: #08131c; font: inherit; font-weight: 700; cursor: pointer; }
+.boton-instalar:focus-visible { outline: 3px solid #e8f1f8; outline-offset: 2px; }
+.instalar-ayuda { margin: 10px 0 0; font-size: .85rem; color: var(--suave); }
+.instalar-ayuda[hidden] { display: none; }

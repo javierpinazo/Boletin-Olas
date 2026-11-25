@@ -8,6 +8,7 @@ import {
   hsBaseDelDia, vientoBaseDelDia, leerSalidas, guardarSalidas,
 } from './salidas.js';
 import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, proximas, trazoLuz } from './luna.js';
+import { textoResumen, enlaceWhatsapp, dibujarTarjeta } from './compartir.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -261,6 +262,11 @@ function graficoHistorico() {
 function pintar() {
   const { tsun, resultados, oleaje } = evaluarTodo();
   const raiz = document.getElementById('app');
+  const oceano = esOceano();
+  const fecha = document.getElementById('fecha-hoy');
+  if (fecha) fecha.textContent = fmt(estado.ahoraMs, { weekday: 'long', day: 'numeric', month: 'long' });
+  // En modo océano el orden lo pone el CSS (order); aquí solo se agregan sus piezas propias.
+  const mejorId = oceano ? estadoDia(resultados).mejor?.playa.id : null;
   const piezas = [
     bannerTsunami(tsun),
     barraLuna(),
@@ -270,13 +276,150 @@ function pintar() {
     pestanas(),
     bloqueOleaje(oleaje),
     bloqueTemperatura(),
-    mejorOpcion(resultados),
-    ...resultados.map((r) => tarjeta(r, oleaje)),
+    oceano ? titularOceano(resultados) : mejorOpcion(resultados),
+    ...resultados.map((r) => {
+      const t = tarjeta(r, oleaje);
+      if (r.playa.id === mejorId) t.classList.add('destacada');
+      return t;
+    }),
+    oceano ? cuadroHoras(resultados) : null,
+    oceano ? compartirDia(resultados) : null,
+    oceano ? instalarApp() : null,
     panelSalidas(),
     seccionGrifos(),
     pie(tsun),
   ];
   raiz.replaceChildren(...piezas.filter(Boolean));
+}
+
+// ---------- Modo océano: piezas que solo existen en ese tema (presentación; la lógica es la misma) ----------
+const esOceano = () => document.documentElement.getAttribute('data-tema') === 'oceano';
+const NOMBRE_DIA = ['Hoy', 'Mañana', 'Pasado mañana'];
+
+function titularOceano(resultados) {
+  const dia = estadoDia(resultados);
+  if (dia.tipo !== 'mejor') {
+    const s = mejorOpcion(resultados);
+    s.classList.add('titular-oceano');
+    return s;
+  }
+  const { mejor } = dia;
+  const cuidado = mejor.color !== 'verde';
+  return el('section', { class: `titular-oceano ${cuidado ? 'cuidado' : 'apto'}` },
+    el('p', { class: 'sobre', text: `${NOMBRE_DIA[estado.dia]} se puede remar${cuidado ? ' con cuidado' : ''}` }),
+    el('h2', { text: `${mejor.playa.nombre}, de ${mejor.bloque.desde} a ${mejor.bloque.hasta} h` }));
+}
+
+function cuadroHoras(resultados) {
+  const { config } = estado;
+  const horas = [];
+  for (let h = config.ventana.horaInicio; h < config.ventana.horaFin; h += 1) horas.push(h);
+  const conDatos = resultados.filter((r) => r.horasDia.length);
+  if (!conDatos.length) return null;
+  const filas = conDatos.map((r) => {
+    const porHora = new Map(r.horasDia.map((h) => [Number(h.hora.slice(11, 13)), h]));
+    return el('div', { class: 'cuadro-fila', role: 'row' },
+      el('span', { class: 'cuadro-nombre', role: 'rowheader', text: r.playa.nombre }),
+      horas.map((h) => {
+        const d = porHora.get(h);
+        const color = d ? d.color : 'gris';
+        return el('span', { class: `cuadro-celda ${color}`, role: 'cell', title: `${r.playa.nombre} ${h} h: ${d ? motivoHora(d) || 'Apto' : 'sin datos'}`, 'aria-label': `${h} h ${d ? ETIQUETA_OCEANO[color] ?? 'sin datos' : 'sin datos'}` });
+      }));
+  });
+  const leyenda = (color, texto) => el('span', { class: 'cuadro-leyenda' }, el('span', { class: `cuadro-celda ${color}`, 'aria-hidden': 'true' }), texto);
+  return el('section', { class: 'cuadro-horas', 'aria-label': 'Cuadro hora a hora de las playas' },
+    el('h2', { text: 'Hora a hora' }),
+    el('div', { class: 'cuadro', role: 'table' },
+      el('div', { class: 'cuadro-fila cabeza', role: 'row' }, el('span', { role: 'columnheader' }), horas.map((h) => el('span', { role: 'columnheader', text: String(h) }))),
+      filas),
+    el('p', { class: 'cuadro-leyendas' }, leyenda('verde', 'Apto'), leyenda('amarillo', 'Con cuidado'), leyenda('rojo', 'No apto')));
+}
+
+const ETIQUETA_OCEANO = { verde: 'Apto', amarillo: 'Con cuidado', naranja: 'Con cuidado', rojo: 'No apto' };
+
+// Resumen del día para la imagen y el texto de "Comparte el día".
+function resumenParaCompartir(resultados) {
+  const dia = estadoDia(resultados);
+  const quien = NOMBRE_DIA[estado.dia];
+  const titular = dia.tipo === 'mejor'
+    ? (dia.mejor.color === 'verde' ? `${quien} sí\nse rema` : `${quien} se rema\ncon cuidado`)
+    : dia.tipo === 'sin-horas' ? `${quien} ya no\nquedan horas` : `${quien} no\nconviene remar`;
+  const playas = resultados.map((r) => {
+    if (r.estado === 'sin-mar') return { nombre: r.playa.nombre, color: 'gris', texto: 'Sin datos' };
+    if (r.bloque) return { nombre: r.playa.nombre, color: r.color, texto: `${r.bloque.desde}–${r.bloque.hasta} h` };
+    if (r.estado !== 'ok') return { nombre: r.playa.nombre, color: 'gris', texto: ETIQUETA_ESTADO[r.estado] };
+    const d = r.grado ? describirSinBloque(r.grado, r.limitante) : { color: r.color, chip: ETIQUETA[r.color] };
+    return { nombre: r.playa.nombre, color: d.color, texto: ETIQUETA_OCEANO[d.color] ?? d.chip };
+  });
+  const temps = Object.values(estado.tempMar?.playas ?? {}).map((t) => t.actual).filter((n) => typeof n === 'number');
+  const ms = Date.parse(`${fechaDelDia(estado.dia)}T12:00:00-05:00`);
+  const luna = FASES[indiceFase(posicionCiclo(ms))];
+  const pie = [temps.length ? `Mar ${num1(temps.reduce((a, b) => a + b, 0) / temps.length)} °C` : null, luna].filter(Boolean).join(' · ');
+  return { fecha: fmt(ms, { weekday: 'long', day: 'numeric', month: 'short' }), titular, playas, pie, url: location.origin };
+}
+
+function compartirDia(resultados) {
+  const datos = resumenParaCompartir(resultados);
+  const lienzo = el('canvas', { class: 'tarjeta-compartir', role: 'img', 'aria-label': textoResumen(datos) });
+  dibujarTarjeta(lienzo, datos);
+  // Si la fuente de títulos aún no llegó, se redibuja cuando esté lista.
+  document.fonts?.ready.then(() => dibujarTarjeta(lienzo, datos)).catch(() => {});
+  const nombreArchivo = `boletin-olas-${fechaDelDia(estado.dia)}.png`;
+  const conImagen = (fn) => lienzo.toBlob((blob) => blob && fn(blob), 'image/png');
+  const whatsapp = el('a', { class: 'boton-oceano verde', href: enlaceWhatsapp(datos), target: '_blank', rel: 'noopener noreferrer', text: 'WhatsApp' });
+  whatsapp.addEventListener('click', (e) => {
+    // En el celular se comparte la imagen; si el navegador no puede, se abre WhatsApp con el texto.
+    if (!navigator.canShare) return;
+    e.preventDefault();
+    conImagen(async (blob) => {
+      const archivo = new File([blob], nombreArchivo, { type: 'image/png' });
+      try {
+        if (navigator.canShare({ files: [archivo] })) await navigator.share({ files: [archivo], text: textoResumen(datos) });
+        else window.open(enlaceWhatsapp(datos), '_blank', 'noopener');
+      } catch { /* el usuario canceló */ }
+    });
+  });
+  const guardar = el('button', { type: 'button', class: 'boton-oceano borde', text: 'Guardar imagen' });
+  guardar.addEventListener('click', () => conImagen((blob) => {
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: nombreArchivo });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }));
+  return el('section', { class: 'compartir' },
+    el('h2', { text: 'Comparte el día' }),
+    el('p', { class: 'compartir-sub', text: 'Una imagen lista para tu grupo de remo' }),
+    lienzo,
+    el('div', { class: 'compartir-botones' }, whatsapp, guardar));
+}
+
+let eventoInstalar = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  if (!esOceano()) return; // en el clásico el navegador se comporta como siempre
+  e.preventDefault();
+  eventoInstalar = e;
+});
+
+function instalarApp() {
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return null; // ya está instalada
+  const ayuda = el('p', { class: 'instalar-ayuda', hidden: '', text: 'En Android: menú ⋮ del navegador › "Instalar app" o "Agregar a la pantalla principal". En iPhone: botón Compartir de Safari › "Agregar a inicio".' });
+  const boton = el('button', { type: 'button', class: 'boton-instalar', text: 'Instalar' });
+  boton.addEventListener('click', async () => {
+    if (eventoInstalar) {
+      eventoInstalar.prompt();
+      await eventoInstalar.userChoice.catch(() => null);
+      eventoInstalar = null;
+    } else {
+      ayuda.hidden = !ayuda.hidden;
+    }
+  });
+  return el('section', { class: 'instalar' },
+    el('div', { class: 'instalar-fila' },
+      el('div', { class: 'instalar-texto' }, el('strong', { text: 'Tenla en tu pantalla de inicio' }), el('span', { text: 'Se abre como una app, sin tienda' })),
+      boton),
+    ayuda);
 }
 
 // ---------- Fases de la Luna (calculadas en el navegador; son informativas, no entran al semáforo) ----------
@@ -375,7 +518,8 @@ function mejorOpcion(resultados) {
 function chipDePlaya(r) {
   if (r.estado !== 'ok') return el('span', { class: 'chip gris', text: ETIQUETA_ESTADO[r.estado] });
   if (r.bloque) {
-    return el('span', { class: `chip ${r.color}`, text: `${SIMBOLO[r.color]} ${r.bloque.desde}–${r.bloque.hasta} h` });
+    const prefijo = esOceano() ? ETIQUETA_OCEANO[r.color] : SIMBOLO[r.color];
+    return el('span', { class: `chip ${r.color}`, text: `${prefijo} ${r.bloque.desde}–${r.bloque.hasta} h` });
   }
   const d = r.grado ? describirSinBloque(r.grado, r.limitante) : { color: r.color, chip: ETIQUETA[r.color] };
   return el('span', { class: `chip ${d.color}`, text: `${SIMBOLO[d.color]} ${d.chip}` });
@@ -676,6 +820,9 @@ function mostrarError(e) {
 }
 
 iniciar().catch(mostrarError);
+
+// Cambio de tema desde el botón de la cabecera (tema.js): solo se vuelve a pintar.
+document.addEventListener('cambio-tema', () => { if (estado.config) pintar(); });
 
 // Al volver a la pestaña tras 3 h o más se pide de nuevo (el servidor decide si hace falta).
 document.addEventListener('visibilitychange', () => {
