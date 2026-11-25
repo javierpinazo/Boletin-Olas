@@ -26,13 +26,20 @@ export function guardarCache(almacen, clave, datos, ahora = Date.now()) {
   }
 }
 
-// Devuelve { datos, t, desdeCache }: el guardado si está vigente; si no (o con forzar), lo pide y lo guarda.
+// Devuelve { datos, t, desdeCache, vencido }: el guardado si está vigente; si no (o con forzar), lo pide y lo
+// guarda. Sin conexión (la petición falla) se usa el último guardado aunque esté vencido, marcado `vencido`.
 export async function conCache(almacen, clave, pedir, { forzar = false, maxMs = MAX_CACHE_MS, ahora = Date.now() } = {}) {
   if (!forzar) {
     const guardado = leerCache(almacen, clave, { maxMs, ahora });
-    if (guardado) return { ...guardado, desdeCache: true };
+    if (guardado) return { ...guardado, desdeCache: true, vencido: false };
   }
-  const datos = await pedir();
-  guardarCache(almacen, clave, datos, ahora);
-  return { datos, t: ahora, desdeCache: false };
+  try {
+    const datos = await pedir();
+    guardarCache(almacen, clave, datos, ahora);
+    return { datos, t: ahora, desdeCache: false, vencido: false };
+  } catch (e) {
+    const viejo = leerCache(almacen, clave, { maxMs: Infinity, ahora });
+    if (viejo) return { ...viejo, desdeCache: true, vencido: true };
+    throw e;
+  }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { combinarHoras, horasDelDia, ahoraLima, cargarMar, mareasDelDia, urlMar, urlViento } from '../site/js/mar.js';
+import { combinarHoras, horasDelDia, ahoraLima, cargarMar, cargarMarVarias, mareasDelDia, urlMar, urlViento } from '../site/js/mar.js';
 
 const marJson = { hourly: { time: ['2026-10-09T06:00', '2026-10-09T07:00'], wave_height: [0.7, null], wave_period: [9.1, 9.0] } };
 const vientoJson = { hourly: { time: ['2026-10-09T06:00', '2026-10-09T07:00'], wind_speed_10m: [5, 9], wind_direction_10m: [200, 210] } };
@@ -73,4 +73,22 @@ test('cargarMar: si Open-Meteo no responde en el plazo, falla con un mensaje cla
     signal.addEventListener('abort', () => { clearTimeout(sostener); rechazar(signal.reason); });
   });
   await assert.rejects(() => cargarMar({ lat: 0, lon: 0 }, colgado, 30), /no respondió a tiempo/);
+});
+
+test('cargarMarVarias: una consulta por API para todas las playas, en orden', async () => {
+  const urls = [];
+  const hora = (v) => ({ hourly: { time: ['2026-11-25T08:00'], wave_height: [v], wind_speed_10m: [v * 10] } });
+  const falso = async (url) => {
+    urls.push(url);
+    return { ok: true, json: async () => [hora(1), hora(2)] };
+  };
+  const r = await cargarMarVarias([{ lat: -12.1, lon: -77 }, { lat: -12.3, lon: -76.8 }], falso);
+  assert.equal(urls.length, 2);
+  assert.match(urls[0], /latitude=-12\.1,-12\.3&longitude=-77,-76\.8/);
+  assert.deepEqual(r.map((h) => [h[0].hs, h[0].vientoKmh]), [[1, 10], [2, 20]]);
+});
+
+test('cargarMarVarias: si faltan lugares en la respuesta, falla', async () => {
+  const falso = async () => ({ ok: true, json: async () => ({ hourly: { time: [] } }) });
+  await assert.rejects(() => cargarMarVarias([{ lat: 0, lon: 0 }, { lat: 1, lon: 1 }], falso), /1 lugares de 2/);
 });

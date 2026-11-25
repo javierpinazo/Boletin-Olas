@@ -1,4 +1,4 @@
-import { cargarMar, horasDelDia, ahoraLima, mareasDelDia } from './mar.js';
+import { cargarMar, cargarMarVarias, horasDelDia, ahoraLima, mareasDelDia } from './mar.js';
 import {
   evaluarPlayaDia, evaluarTsunami, estadoDhn, estadoDia, resultadoSinMar, alertaOleaje, resumenOleajeDia, ETIQUETA_NIVEL,
   describirSinBloque, motivoHora, gradoMar, colorRafaga, COLOR_GRADO, ETIQUETA_GRADO,
@@ -64,19 +64,25 @@ async function iniciar({ forzar = false } = {}) {
   const a = almacen();
   estado.config = await cargarJson('./config.json');
   const json = (clave, url) => conCache(a, clave, () => cargarJson(url), { forzar }).then((r) => r.datos).catch(() => null);
-  const [dhn, tempMar, climaMar, grifos, ...mar] = await Promise.all([
+  const { playas } = estado.config;
+  const [dhn, tempMar, climaMar, grifos, mar] = await Promise.all([
     cargarJson('./data/dhn.json').catch(() => null),
     json('temp-mar', './data/temp-mar.json'),
     json('clima-mar', './clima-mar.json'),
     json('grifos', './data/grifos.json'),
-    ...estado.config.playas.map((p) => conCache(a, `mar:${p.id}:${p.lat},${p.lon}`, () => cargarMar(p), { forzar }).catch(() => null)),
+    // Las 4 playas en una sola consulta por API; si esa falla, playa por playa (una mala no tumba a las demás).
+    conCache(a, `mar:${playas.map((p) => `${p.lat},${p.lon}`).join(';')}`, () => cargarMarVarias(playas).catch(async () => {
+      const sueltas = await Promise.allSettled(playas.map((p) => cargarMar(p)));
+      if (sueltas.every((s) => s.status === 'rejected')) throw sueltas[0].reason;
+      return sueltas.map((s) => (s.status === 'fulfilled' ? s.value : null));
+    }), { forzar }).catch(() => null),
   ]);
   Object.assign(estado, { dhn, tempMar, climaMar, grifos });
-  estado.mar = mar.map((m) => m?.datos ?? null);
+  estado.mar = mar?.datos ?? playas.map(() => null);
   estado.salidas = leerSalidas(a);
   estado.ahoraMs = Date.now();
-  const tiempos = mar.filter(Boolean).map((m) => m.t);
-  estado.marMs = tiempos.length ? Math.min(...tiempos) : estado.ahoraMs; // la consulta más antigua en uso
+  estado.marMs = mar?.t ?? estado.ahoraMs;
+  estado.sinConexion = Boolean(mar?.vencido);
   estado.diaCargado = ahoraLima(estado.ahoraMs).slice(0, 10);
   pintar();
   refrescar({ forzar });
@@ -292,6 +298,7 @@ function pintar() {
   const piezas = [
     bannerTsunami(tsun),
     barraLuna(),
+    bannerSinConexion(),
     bannerActualizando(),
     bannerDhn(),
     bannerOleaje(resultados),
@@ -525,6 +532,13 @@ function bannerOleaje(resultados) {
   return el('section', { class: 'banner rojo', role: 'alert' },
     el('strong', { text: `✖ Oleaje ${alerta.nivel} según el DHN` }),
     el('p', { text: 'Hay horas de este día con oleaje anómalo fuerte: esas horas figuran en rojo.' }));
+}
+
+function bannerSinConexion() {
+  if (!estado.sinConexion) return null;
+  return el('section', { class: 'banner amarillo', role: 'status' },
+    el('strong', { text: `⚠ Sin conexión: mar consultado el ${fechaCorta(estado.marMs)} a las ${horaCorta(estado.marMs)}` }),
+    el('p', { text: 'Es el último pronóstico guardado en este celular. Revisa de nuevo cuando tengas señal.' }));
 }
 
 function bannerActualizando() {
@@ -890,6 +904,9 @@ function mostrarError(e) {
 }
 
 iniciar().catch(mostrarError);
+
+// Service worker: abrir al instante y sin conexión (ver sw.js). Si el navegador no lo admite, no pasa nada.
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 
 // Cambio de tema desde el botón de la cabecera (tema.js): solo se vuelve a pintar.
 document.addEventListener('cambio-tema', () => { if (estado.config) pintar(); });

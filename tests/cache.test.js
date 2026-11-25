@@ -44,6 +44,15 @@ test('conCache: sin almacenamiento (modo privado) pide siempre y no falla', asyn
   assert.equal(pedidos, 2);
 });
 
+test('conCache: sin conexión usa el último guardado aunque esté vencido, marcado', async () => {
+  const a = memoria();
+  guardarCache(a, 'k', 'viejo', 0);
+  const r = await conCache(a, 'k', async () => { throw new Error('sin red'); }, { ahora: 5 * 3600_000 });
+  assert.equal(r.datos, 'viejo');
+  assert.equal(r.vencido, true);
+  assert.equal(r.t, 0);
+});
+
 test('conCache: si la petición falla, el error sube y no se guarda nada', async () => {
   const a = memoria();
   await assert.rejects(() => conCache(a, 'k', async () => { throw new Error('sin red'); }), /sin red/);

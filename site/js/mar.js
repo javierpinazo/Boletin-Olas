@@ -68,6 +68,31 @@ export function mareasDelDia(horas, fecha) {
 }
 
 // Cada consulta tiene un plazo: si Open-Meteo se cuelga, la página no se queda "consultando" para siempre.
+// Varias playas en una sola consulta por API (Open-Meteo admite coordenadas separadas por comas y devuelve
+// una lista en el mismo orden): 2 peticiones en total en vez de 2 por playa. Devuelve las horas de cada playa.
+export const urlVarias = (base, campos, playas) =>
+  `${base}?latitude=${playas.map((p) => p.lat).join(',')}&longitude=${playas.map((p) => p.lon).join(',')}&hourly=${Object.keys(campos).join(',')}&${COMUN}`;
+
+export async function cargarMarVarias(playas, fetchFn = fetch, timeoutMs = 20000) {
+  const pedir = async (url) => {
+    const signal = AbortSignal.timeout(timeoutMs);
+    let r;
+    try {
+      r = await fetchFn(url, { signal });
+    } catch (e) {
+      if (signal.aborted) throw new Error(`Open-Meteo no respondió a tiempo (${timeoutMs / 1000} s)`);
+      throw e;
+    }
+    if (!r.ok) throw new Error(`Open-Meteo respondió ${r.status}`);
+    const json = await r.json();
+    const lista = Array.isArray(json) ? json : [json];
+    if (lista.length !== playas.length) throw new Error(`Open-Meteo devolvió ${lista.length} lugares de ${playas.length}`);
+    return lista;
+  };
+  const [mar, viento] = await Promise.all([pedir(urlVarias(MARINO, CAMPOS_MAR, playas)), pedir(urlVarias(VIENTO, CAMPOS_VIENTO, playas))]);
+  return playas.map((_, i) => combinarHoras(mar[i], viento[i]));
+}
+
 export async function cargarMar(playa, fetchFn = fetch, timeoutMs = 15000) {
   const pedir = async (url) => {
     const signal = AbortSignal.timeout(timeoutMs);
