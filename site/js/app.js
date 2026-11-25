@@ -10,6 +10,9 @@ import {
 import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, proximas, trazoLuz } from './luna.js';
 import { textoResumen, enlaceWhatsapp, dibujarTarjeta } from './compartir.js';
 import { conCache, leerCache, guardarCache } from './cache.js';
+import { cercanas, zonasDe, conGrifos } from './catalogo.js';
+import { iniciarMisPlayas, guardarMisPlayas } from './mis-playas.js';
+import { panelSelector } from './selector.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -53,31 +56,38 @@ async function cargarJson(url) {
 const estado = {
   dia: 0, config: null, dhn: null, mar: [], ahoraMs: 0, marMs: 0, diaCargado: null,
   actualizando: false, ultimoRefresco: 0, tempMar: null, climaMar: null, grifos: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
+  // Mis playas: catálogo completo, ids elegidos y estado del panel para elegirlas.
+  catalogo: null, ids: null, selector: false, consulta: '', cerca: null, ubicando: false, mensajeSelector: '', turno: 0,
 };
 
 // Uso frecuente: lo pedido hace menos de 30 min (Open-Meteo, temperatura, grifos, clima) sale de la caché del
 // navegador sin volver a pedirse. El aviso del DHN se lee siempre (es un archivo pequeño y trae las alertas de
 // tsunami, que no deben esperar). Todo se pide en paralelo.
 async function iniciar({ forzar = false } = {}) {
+  const turno = (estado.turno += 1); // si empieza otra carga, el resultado de esta se descarta
   const raiz = document.getElementById('app');
-  raiz.replaceChildren(el('p', { class: 'cargando', text: 'Consultando el mar y el aviso del DHN…' }));
+  if (!estado.selector) raiz.replaceChildren(el('p', { class: 'cargando', text: 'Consultando el mar y el aviso del DHN…' }));
   const a = almacen();
-  estado.config = await cargarJson('./config.json');
+  const [config, catalogo] = await Promise.all([cargarJson('./config.json'), cargarJson('./playas.json')]);
+  // Antes de guardar nada en caché: iniciarMisPlayas distingue así al usuario nuevo del que ya usaba la app.
+  estado.ids ??= iniciarMisPlayas(a, catalogo.playas.map((p) => p.id));
+  const playas = estado.ids.map((id) => catalogo.playas.find((p) => p.id === id)).filter(Boolean);
   const json = (clave, url) => conCache(a, clave, () => cargarJson(url), { forzar }).then((r) => r.datos).catch(() => null);
-  const { playas } = estado.config;
   const [dhn, tempMar, climaMar, grifos, mar] = await Promise.all([
     cargarJson('./data/dhn.json').catch(() => null),
-    json('temp-mar', './data/temp-mar.json'),
-    json('clima-mar', './clima-mar.json'),
+    json('temp-mar-zonas', './data/temp-mar.json'),
+    json('clima-mar-zonas', './clima-mar.json'),
     json('grifos', './data/grifos.json'),
-    // Las 4 playas en una sola consulta por API; si esa falla, playa por playa (una mala no tumba a las demás).
-    conCache(a, `mar:${playas.map((p) => `${p.lat},${p.lon}`).join(';')}`, () => cargarMarVarias(playas).catch(async () => {
+    // Todas las playas en una sola consulta por API; si esa falla, playa por playa (una mala no tumba a las demás).
+    !playas.length ? null : conCache(a, `mar:${playas.map((p) => `${p.lat},${p.lon}`).join(';')}`, () => cargarMarVarias(playas).catch(async () => {
       const sueltas = await Promise.allSettled(playas.map((p) => cargarMar(p)));
       if (sueltas.every((s) => s.status === 'rejected')) throw sueltas[0].reason;
       return sueltas.map((s) => (s.status === 'fulfilled' ? s.value : null));
     }), { forzar }).catch(() => null),
   ]);
-  Object.assign(estado, { dhn, tempMar, climaMar, grifos });
+  if (turno !== estado.turno) return;
+  // Playas y datos del mar se asignan juntos: van emparejados por posición.
+  Object.assign(estado, { catalogo, config: { ...config, playas }, dhn, tempMar, climaMar, grifos });
   estado.mar = mar?.datos ?? playas.map(() => null);
   estado.salidas = leerSalidas(a);
   estado.ahoraMs = Date.now();
@@ -210,9 +220,9 @@ const diaDelAnio = (iso) => Math.floor((Date.parse(`${iso}T00:00:00Z`) - Date.pa
 function bloqueTemperatura() {
   const { tempMar, climaMar, config } = estado;
   if (!tempMar || !climaMar) return null;
-  const medidas = config.playas.map((p) => {
-    const t = tempMar.playas?.[p.id];
-    const normal = climaMar.playas?.[p.id]?.[t ? diaDelAnio(t.fecha) : 0];
+  const medidas = zonasDe(config.playas).map((zona) => {
+    const t = tempMar.zonas?.[zona];
+    const normal = climaMar.zonas?.[zona]?.[t ? diaDelAnio(t.fecha) : 0];
     return t && typeof normal === 'number' ? { actual: t.actual, normal, fecha: t.fecha, fuente: t.fuente ?? 'oisst' } : null;
   }).filter(Boolean);
   if (!medidas.length) return null;
@@ -240,7 +250,7 @@ function bloqueTemperatura() {
     el('div', { class: 'escala', role: 'img', 'aria-label': `${titular}` }, marca),
     el('div', { class: 'escala-rotulos' }, el('span', { text: `−${limite} °C` }), el('span', { text: 'habitual' }), el('span', { text: `+${limite} °C` })),
     graficoHistorico(),
-    el('p', { class: 'gris pequeno', text: `${medidas.every((m) => m.fuente === 'openmeteo') ? 'Dato del modelo Open-Meteo, usado porque NOAA no respondió' : 'Lectura satelital (NOAA OISST, preliminar)'} del ${fechaCorta(Date.parse(`${medidas[0].fecha}T12:00:00-05:00`))}; habitual = promedio 1991–2020 de ese día. Es del mar abierto frente a la costa: en la orilla puede variar.` }),
+    el('p', { class: 'gris pequeno', text: `${medidas.every((m) => m.fuente === 'openmeteo') ? 'Dato del modelo Open-Meteo, usado porque NOAA no respondió' : 'Lectura satelital (NOAA OISST, preliminar)'} del ${fechaCorta(Date.parse(`${medidas[0].fecha}T12:00:00-05:00`))}; habitual = promedio 1991–2020 de ese día. Referencia de la zona, mar abierto frente a la costa: en la orilla puede variar.` }),
     diasAtraso > 7 ? el('p', { class: 'nota', text: `Atención: el último dato de temperatura del mar tiene ${diasAtraso} días.` }) : null);
 }
 
@@ -256,9 +266,9 @@ function svg(tag, attrs, ...hijos) {
 function graficoHistorico() {
   const { tempMar, climaMar, config } = estado;
   const porFecha = new Map();
-  for (const p of config.playas) {
-    for (const [fecha, sst] of tempMar.playas?.[p.id]?.serie ?? []) {
-      const normal = climaMar.playas?.[p.id]?.[diaDelAnio(fecha)];
+  for (const zona of zonasDe(config.playas)) {
+    for (const [fecha, sst] of tempMar.zonas?.[zona]?.serie ?? []) {
+      const normal = climaMar.zonas?.[zona]?.[diaDelAnio(fecha)];
       if (typeof normal !== 'number') continue;
       const a = porFecha.get(fecha) ?? { sst: 0, normal: 0, n: 0 };
       a.sst += sst; a.normal += normal; a.n += 1;
@@ -288,20 +298,34 @@ function graficoHistorico() {
 }
 
 function pintar() {
-  const { tsun, resultados, oleaje } = evaluarTodo();
   const raiz = document.getElementById('app');
-  const oceano = esOceano();
+  // Al repintar se devuelve el foco al mismo control del panel (y el cursor, si era el campo de búsqueda).
+  const activo = document.activeElement;
+  const foco = activo?.getAttribute?.('data-foco');
+  const cursor = foco === 'buscar-playa' ? activo.selectionStart : null;
   const fecha = document.getElementById('fecha-hoy');
   if (fecha) fecha.textContent = fmt(estado.ahoraMs, { weekday: 'long', day: 'numeric', month: 'long' });
+  raiz.replaceChildren(...(estado.config.playas.length ? piezasConPlayas() : piezasSinPlayas()).filter(Boolean));
+  if (!foco) return;
+  const nodo = raiz.querySelector(`[data-foco="${foco}"]`);
+  if (!nodo || nodo.disabled) return;
+  nodo.focus({ preventScroll: true });
+  if (cursor !== null) nodo.setSelectionRange?.(cursor, cursor);
+}
+
+function piezasConPlayas() {
+  const { tsun, resultados, oleaje } = evaluarTodo();
+  const oceano = esOceano();
   // Mismo orden en los dos temas; el océano solo agrega sus piezas propias después de las playas.
   const mejorId = oceano ? estadoDia(resultados).mejor?.playa.id : null;
-  const piezas = [
+  return [
     bannerTsunami(tsun),
     barraLuna(),
     bannerSinConexion(),
     bannerActualizando(),
     bannerDhn(),
     bannerOleaje(resultados),
+    estado.selector ? selectorPlayas() : botonMisPlayas(),
     pestanas(),
     bloqueOleaje(oleaje),
     bloqueTemperatura(),
@@ -318,7 +342,84 @@ function pintar() {
     seccionGrifos(),
     pie(tsun),
   ];
-  raiz.replaceChildren(...piezas.filter(Boolean));
+}
+
+// Sin playas no hay semáforo, pero las alertas de tsunami y el estado del DHN se muestran igual.
+function piezasSinPlayas() {
+  const tsun = evaluarTsunami(estado.dhn?.tsunami, estado.ahoraMs);
+  return [bannerTsunami(tsun), bannerActualizando(), bannerDhn(), selectorPlayas(), pie(tsun)];
+}
+
+// ---------- Mis playas ----------
+function botonMisPlayas() {
+  const b = el('button', { type: 'button', class: 'boton-mis-playas', 'data-foco': 'mis-playas', text: '📍 Mis playas · agregar o cambiar' });
+  b.addEventListener('click', () => { estado.selector = true; pintar(); });
+  return b;
+}
+
+function selectorPlayas() {
+  estado.selector = true;
+  return panelSelector({
+    el,
+    catalogo: estado.catalogo,
+    ids: estado.ids,
+    consulta: estado.consulta,
+    cerca: estado.cerca,
+    ubicando: estado.ubicando,
+    mensaje: estado.mensajeSelector,
+    alCambiar: cambiarMisPlayas,
+    alBuscar: (texto) => { estado.consulta = texto; estado.cerca = null; },
+    alUbicar: ubicar,
+    alCerrar: cerrarSelector,
+  });
+}
+
+function cambiarMisPlayas(ids) {
+  estado.ids = ids;
+  estado.mensajeSelector = guardarMisPlayas(almacen(), ids)
+    ? ''
+    : 'No pude guardar en este navegador: tu selección dura mientras la página esté abierta.';
+  pintar();
+}
+
+function cerrarSelector() {
+  Object.assign(estado, { selector: false, consulta: '', cerca: null, mensajeSelector: '' });
+  const cargadas = estado.config.playas.map((p) => p.id).join();
+  if (cargadas === estado.ids.join()) pintar();
+  else iniciar().catch(mostrarError);
+}
+
+const ERROR_UBICACION = {
+  1: 'No diste permiso para usar la ubicación. Puedes activarlo en el navegador o buscar tu playa por nombre.',
+  2: 'No pude obtener tu ubicación (sin señal de GPS). Busca tu playa por nombre.',
+  3: 'La ubicación tardó demasiado. Intenta de nuevo o busca tu playa por nombre.',
+};
+
+// La posición solo se usa para ordenar el catálogo aquí mismo: no se guarda ni se envía.
+function ubicar() {
+  if (!navigator.geolocation || window.isSecureContext === false) {
+    estado.mensajeSelector = 'Este navegador no permite usar la ubicación aquí. Busca tu playa por nombre.';
+    pintar();
+    return;
+  }
+  Object.assign(estado, { ubicando: true, mensajeSelector: '' });
+  pintar();
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      estado.ubicando = false;
+      if (!estado.selector) return;
+      estado.consulta = '';
+      estado.cerca = cercanas(estado.catalogo.playas, { lat: coords.latitude, lon: coords.longitude });
+      pintar();
+    },
+    (e) => {
+      estado.ubicando = false;
+      if (!estado.selector) return;
+      estado.mensajeSelector = ERROR_UBICACION[e.code] ?? ERROR_UBICACION[2];
+      pintar();
+    },
+    { timeout: 15000, maximumAge: 600000 },
+  );
 }
 
 // ---------- Modo océano: piezas que solo existen en ese tema (presentación; la lógica es la misma) ----------
@@ -386,10 +487,10 @@ function fichaOleaje(oleaje) {
 
 function fichaTemperatura() {
   const { tempMar, climaMar, config } = estado;
-  // Igual que el bloque de temperatura: promedio de las playas, actual frente a lo habitual de ese día.
-  const medidas = config.playas.map((p) => {
-    const t = tempMar?.playas?.[p.id];
-    return t ? { actual: t.actual, normal: climaMar?.playas?.[p.id]?.[diaDelAnio(t.fecha)] } : null;
+  // Igual que el bloque de temperatura: promedio de las zonas de tus playas, actual frente a lo habitual de ese día.
+  const medidas = zonasDe(config.playas).map((zona) => {
+    const t = tempMar?.zonas?.[zona];
+    return t ? { actual: t.actual, normal: climaMar?.zonas?.[zona]?.[diaDelAnio(t.fecha)] } : null;
   }).filter(Boolean);
   if (!medidas.length) return null;
   const actual = medidas.reduce((s, m) => s + m.actual, 0) / medidas.length;
@@ -617,17 +718,20 @@ function nivelDePlaya(playa, oleaje) {
 function notaFactor(r) {
   const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id && s.impresion).length;
   if (r.aprendido) {
-    return `Ola en tu zona = ola del modelo × ${coma(r.aprendido.factor)}, aprendido de tus ${r.aprendido.n} salidas (el config dice ${coma(r.playa.factorOla ?? 1)}).`;
+    return `Ola en tu zona = ola del modelo × ${coma(r.aprendido.factor)}, aprendido de tus ${r.aprendido.n} salidas (sin tus salidas sería ${coma(r.playa.factorOla ?? 1)}).`;
   }
-  return `Ola en tu zona = ola del modelo × ${coma(r.playa.factorOla ?? 1)} (del config). Registra cómo estaba el mar en 3 salidas para calibrarlo: llevas ${salidasPlaya}.`;
+  if (r.playa.factorOla === undefined) {
+    return `Sin calibrar: usa la ola completa del modelo, que suele ser mayor que en una zona protegida. Registra cómo estaba el mar en 3 salidas para ajustarlo: llevas ${salidasPlaya}.`;
+  }
+  return `Ola en tu zona = ola del modelo × ${coma(r.playa.factorOla)} (del catálogo). Registra cómo estaba el mar en 3 salidas para calibrarlo: llevas ${salidasPlaya}.`;
 }
 
 function notaViento(r) {
   const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id && s.viento).length;
   if (r.aprendidoViento) {
-    return `Viento en tu zona = viento del modelo × ${coma(r.aprendidoViento.factor)}, aprendido de tus ${r.aprendidoViento.n} salidas (el config dice ${coma(r.playa.factorViento ?? 1)}). Las ráfagas se corrigen igual.`;
+    return `Viento en tu zona = viento del modelo × ${coma(r.aprendidoViento.factor)}, aprendido de tus ${r.aprendidoViento.n} salidas (sin tus salidas sería ${coma(r.playa.factorViento ?? 1)}). Las ráfagas se corrigen igual.`;
   }
-  if ((r.playa.factorViento ?? 1) !== 1) return `Viento en tu zona = viento del modelo × ${coma(r.playa.factorViento)} (del config).`;
+  if ((r.playa.factorViento ?? 1) !== 1) return `Viento en tu zona = viento del modelo × ${coma(r.playa.factorViento)} (del catálogo).`;
   return `El viento y las ráfagas son del modelo, de una celda a varios km. Registra cómo estaba el viento en 3 salidas para corregirlos: llevas ${salidasPlaya}.`;
 }
 
@@ -682,6 +786,15 @@ function bloqueRegistro(r) {
     filaRegistro(r, ya, 'viento', '¿Y el viento?', IMPRESIONES_VIENTO, ya?.viento));
 }
 
+// Avisos de la ficha de una playa: ola sin ajustar y ubicación u orientación sin confirmar.
+function avisosFicha(r) {
+  const sinCalibrar = r.playa.factorOla === undefined && !r.aprendido;
+  if (!sinCalibrar && r.playa.verificada) return null;
+  return el('p', { class: 'ficha-avisos' },
+    sinCalibrar ? el('span', { class: 'sin-calibrar', text: 'Sin calibrar' }) : null,
+    r.playa.verificada ? null : el('small', { class: 'gris', text: 'Ubicación y orientación sin verificar por remeros de la zona' }));
+}
+
 function tarjeta(r, oleaje) {
   if (r.estado === 'sin-mar') {
     return el('article', { class: 'playa sin-datos' }, el('h3', { text: r.playa.nombre }), el('p', { text: 'No pude obtener el mar ahora. Reintenta más tarde.' }));
@@ -715,7 +828,7 @@ function tarjeta(r, oleaje) {
     if (detalles.open) estado.abiertas.add(r.playa.id);
     else estado.abiertas.delete(r.playa.id);
   });
-  return el('article', { class: 'playa' }, cabecera, panelGrafico(r), detalles);
+  return el('article', { class: 'playa' }, cabecera, avisosFicha(r), panelGrafico(r), detalles);
 }
 
 const pct = (v, max) => `${Math.max(6, Math.min(100, Math.round((v / max) * 100)))}%`;
@@ -858,7 +971,7 @@ function filaGrifo(g, referencia) {
 
 function seccionGrifos() {
   const { grifos } = estado;
-  if (!grifos) return null;
+  if (!grifos || !conGrifos(estado.config.playas)) return null;
   const candidatos = [...grifos.favoritos.filter((g) => !g.sinPrecio), ...grifos.zonas.flatMap((z) => z.grifos)];
   const referencia = candidatos.length ? Math.min(...candidatos.map((g) => g.precio)) : null;
   const generado = Date.parse(grifos.generadoEn);
@@ -868,10 +981,10 @@ function seccionGrifos() {
       el('h2', { text: `Combustible · ${grifos.producto}` }),
       referencia !== null ? el('span', { class: 'grifos-desde', text: `Desde ${soles(referencia)}` }) : null));
   const plegable = el('details', estado.grifosAbierto ? { open: '' } : {}, cabecera,
-    referencia !== null ? el('p', { class: 'resumen', text: `El más barato de tus opciones: ${soles(referencia)} por ${grifos.unidad}. Mediana en Lima: ${soles(grifos.medianaLima)}.` }) : null,
-    el('h3', { text: 'Tus grifos' }),
+    referencia !== null ? el('p', { class: 'resumen', text: `El más barato de estas opciones: ${soles(referencia)} por ${grifos.unidad}. Mediana en Lima: ${soles(grifos.medianaLima)}.` }) : null,
+    el('h3', { text: 'Grifos destacados' }),
     el('ul', {}, grifos.favoritos.map((g) => filaGrifo(g, referencia))),
-    el('h3', { text: 'Más baratos en tu ruta' }),
+    el('h3', { text: 'Más baratos en las rutas al mar de Lima' }),
     grifos.zonas.map((z) => el('div', { class: 'zona' },
       el('p', { class: 'zona-nombre', text: z.nombre }),
       z.grifos.length ? el('ul', {}, z.grifos.map((g) => filaGrifo(g, referencia))) : el('p', { class: 'gris pequeno', text: 'Sin precios recientes en este tramo.' }))),
@@ -895,7 +1008,8 @@ function pie(tsun) {
     lineas.push(el('p', { class: 'gris', text: `Sismo ${b.magnitud ?? '?'} Mw ${b.lugar ?? ''}: sin tsunami en el litoral peruano (boletín ${b.numero}).` }));
   }
   const minutos = Math.max(0, Math.round((Date.now() - marMs) / 60_000));
-  lineas.push(el('p', { class: 'gris', text: `Datos del DHN leídos: ${dhn ? `${fechaCorta(Date.parse(dhn.generadoEn))} ${horaCorta(Date.parse(dhn.generadoEn))}` : 'no disponible'} · Mar consultado: ${horaCorta(marMs)}${minutos >= 1 ? ` (hace ${minutos} min)` : ''}` }));  lineas.push(el('p', { class: 'gris', text: 'Oleaje, viento, ráfagas y mareas son de modelo (Open-Meteo), no medidos en la orilla; varias playas pueden compartir la misma celda del modelo. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
+  lineas.push(el('p', { class: 'gris', text: `Datos del DHN leídos: ${dhn ? `${fechaCorta(Date.parse(dhn.generadoEn))} ${horaCorta(Date.parse(dhn.generadoEn))}` : 'no disponible'}${estado.config.playas.length ? ` · Mar consultado: ${horaCorta(marMs)}${minutos >= 1 ? ` (hace ${minutos} min)` : ''}` : ''}` }));
+  lineas.push(el('p', { class: 'gris pequeno', text: estado.catalogo.fuente }));  lineas.push(el('p', { class: 'gris', text: 'Oleaje, viento, ráfagas y mareas son de modelo (Open-Meteo), no medidos en la orilla; varias playas pueden compartir la misma celda del modelo. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
   lineas.push(el('p', { class: 'gris' },
     el('a', { href: 'https://www.dhn.mil.pe/portal/', text: 'dhn.mil.pe', rel: 'noopener' }), ' · ',
     el('a', { href: 'https://www.dhn.mil.pe/portal/boletin-diario-condiciones-oceanograficas', text: 'Boletín oceanográfico diario', rel: 'noopener' }), ' · ',

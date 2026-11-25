@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { normalizar, buscar, distanciaKm, cercanas } from '../site/js/catalogo.js';
+import { normalizar, buscar, distanciaKm, cercanas, zonasDe, conGrifos } from '../site/js/catalogo.js';
 import { tramoParaPlaya } from '../site/js/score.js';
 
 const catalogo = JSON.parse(fs.readFileSync(new URL('../site/playas.json', import.meta.url), 'utf8'));
@@ -84,4 +84,16 @@ test('cercanas: ordena por distancia', () => {
   for (let i = 1; i < r.length; i += 1) assert.ok(r[i].km >= r[i - 1].km);
   const km = distanciaKm({ lat: -12, lon: -77 }, { lat: -13, lon: -77 });
   assert.ok(km > 110 && km < 112, String(km));
+});
+
+test('zonasDe: zonas distintas de las playas elegidas, en su orden', () => {
+  assert.deepEqual(zonasDe([{ zonaTemp: 'callao' }, { zonaTemp: 'ilo' }, { zonaTemp: 'callao' }]), ['callao', 'ilo']);
+  assert.deepEqual(zonasDe([]), []);
+});
+
+test('conGrifos: solo si alguna playa elegida es de Lima o Callao', () => {
+  assert.equal(conGrifos([{ region: 'Piura' }, { region: 'Callao' }]), true);
+  assert.equal(conGrifos([{ region: 'Lima' }]), true);
+  assert.equal(conGrifos([{ region: 'Piura' }]), false);
+  assert.equal(conGrifos([]), false);
 });

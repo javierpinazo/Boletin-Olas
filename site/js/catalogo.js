@@ -28,3 +28,9 @@ export function cercanas(playas, posicion, n = 5) {
     .sort((a, b) => a.km - b.km)
     .slice(0, n);
 }
+
+// Zonas de temperatura distintas de las playas dadas.
+export const zonasDe = (playas) => [...new Set(playas.map((p) => p.zonaTemp))];
+
+// Los grifos configurados son de Lima: solo tienen sentido con alguna playa de Lima o Callao.
+export const conGrifos = (playas) => playas.some((p) => p.region === 'Lima' || p.region === 'Callao');

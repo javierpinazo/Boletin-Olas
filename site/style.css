@@ -432,3 +432,28 @@ footer p { margin: 6px 0; }
 .boton-instalar:focus-visible { outline: 3px solid #e8f1f8; outline-offset: 2px; }
 .instalar-ayuda { margin: 10px 0 0; font-size: .85rem; color: var(--suave); }
 .instalar-ayuda[hidden] { display: none; }
+
+/* ---------- Mis playas ---------- */
+.boton-mis-playas, .selector button {
+  min-height: 44px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto);
+  font: inherit; cursor: pointer;
+}
+.boton-mis-playas { width: 100%; font-weight: 600; }
+.boton-mis-playas:focus-visible, .selector button:focus-visible, .sel-buscar:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+.selector { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 20px; padding: 14px 16px; }
+.selector h2 { margin: 0 0 6px; font-size: 1.2rem; }
+.selector h3 { margin: 14px 0 4px; font-size: .95rem; }
+.selector ul { list-style: none; margin: 0; padding: 0; }
+.selector li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--borde); }
+.sel-nombre { display: flex; flex-direction: column; min-width: 0; }
+.sel-botones { display: flex; gap: 6px; flex: 0 0 auto; }
+.selector button { min-width: 44px; padding: 0 12px; background: var(--caja, var(--fondo)); }
+.selector button:disabled { opacity: .4; cursor: default; }
+.selector > button { width: 100%; margin-top: 10px; background: var(--acento); color: var(--fondo); border-color: var(--acento); font-weight: 700; }
+.sel-barra { display: flex; flex-wrap: wrap; gap: 8px; }
+.sel-buscar {
+  flex: 1 1 180px; min-width: 0; min-height: 44px; border-radius: 12px; border: 1px solid var(--borde);
+  background: var(--caja, var(--fondo)); color: var(--texto); font: inherit; padding: 0 12px;
+}
+.ficha-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
+.sin-calibrar { font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--amarillo-fondo); color: var(--amarillo); }
