@@ -32,7 +32,8 @@ async function principal() {
   );
   if (dhn.parseError) console.warn(`Aviso no entendido: ${dhn.avisoCrudo.motivo}`);
   const config = JSON.parse(fs.readFileSync(path.join(RAIZ, 'site', 'config.json'), 'utf8'));
-  await escribirTempMar(config.playas, path.join(RAIZ, 'data', 'temp-mar.json'));
+  const { zonas } = JSON.parse(fs.readFileSync(path.join(RAIZ, 'site', 'playas.json'), 'utf8'));
+  await escribirTempMar(zonas, path.join(RAIZ, 'data', 'temp-mar.json'));
   await escribirGrifos(config, path.join(RAIZ, 'data', 'grifos.json'));
 }
 

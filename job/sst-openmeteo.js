@@ -2,9 +2,10 @@
 // no tiene historial, así que solo se usa cuando NOAA OISST falla; el "habitual" sigue saliendo de OISST.
 const MARINO = 'https://marine-api.open-meteo.com/v1/marine';
 
-export async function pedirOpenMeteo({ lat, lon, ahora = new Date(), dias = 45, fetchFn = fetch }) {
+export async function pedirOpenMeteo({ lat, lon, ahora = new Date(), dias = 45, fetchFn = fetch, senal }) {
   const url = `${MARINO}?latitude=${lat}&longitude=${lon}&hourly=sea_surface_temperature&past_days=${dias}&forecast_days=1&timezone=America%2FLima`;
-  const r = await fetchFn(url, { signal: AbortSignal.timeout(30_000) });
+  const propia = AbortSignal.timeout(30_000);
+  const r = await fetchFn(url, { signal: senal ? AbortSignal.any([propia, senal]) : propia });
   if (!r.ok) throw new Error(`Open-Meteo ${r.status}`);
   const { hourly } = await r.json();
   const limite = ahora.getTime();
