@@ -1,7 +1,7 @@
 {
   "name": "Boletín Olas",
   "short_name": "Olas",
-  "description": "¿Es buen día para remar en mar calmo en Lima sur y Callao?",
+  "description": "¿Es buen día para remar en mar calmo? Semáforo para playas de todo el Perú.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#08131c",

@@ -82,6 +82,9 @@ function luna(ctx, p, cx, cy, r) {
   ctx.restore();
 }
 
+// Filas de playas entre y=940 y la luna: hasta 4 completas; con 5 o 6, compactas (nombre, color y horario).
+export const disposicionPlayas = (n) => (n <= 4 ? { paso: 190, alto: 170, cifras: true } : { paso: 122, alto: 106, cifras: false });
+
 export function dibujarTarjeta(canvas, datos) {
   canvas.width = ANCHO;
   canvas.height = ALTO;
@@ -135,19 +138,21 @@ export function dibujarTarjeta(canvas, datos) {
 
   // Playas: punto de color, nombre, horario y tres cifras con ícono.
   let y = 940;
+  const fila = disposicionPlayas(datos.playas.length);
+  const base = fila.cifras ? 74 : 69; // línea base del nombre dentro de la fila
   for (const p of datos.playas) {
     ctx.fillStyle = '#12293b';
-    redondeado(ctx, M, y, UTIL, 170, 32);
+    redondeado(ctx, M, y, UTIL, fila.alto, 32);
     ctx.fill();
     ctx.fillStyle = COLOR_PUNTO[p.color] ?? COLOR_PUNTO.gris;
     ctx.beginPath();
-    ctx.arc(M + 48, y + 58, 16, 0, Math.PI * 2);
+    ctx.arc(M + 48, y + base - 16, 16, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = COLOR_PUNTO[p.color] ?? '#e8f1f8';
-    const anchoEstado = texto(ctx, p.estado, ANCHO - M - 36, y + 74, 300, 46, TITULO, 'right');
+    const anchoEstado = texto(ctx, p.estado, ANCHO - M - 36, y + base, 300, 46, TITULO, 'right');
     ctx.fillStyle = '#e8f1f8';
-    texto(ctx, p.nombre, M + 84, y + 74, UTIL - 160 - anchoEstado, 48, CUERPO(700));
-    if (p.ola) {
+    texto(ctx, p.nombre, M + 84, y + base, UTIL - 160 - anchoEstado, 48, CUERPO(700));
+    if (fila.cifras && p.ola) {
       const cifras = [['ola', p.ola], ['viento', p.viento], ['rafaga', p.rafaga]];
       cifras.forEach(([ic, v], i) => {
         const x = M + 84 + i * 250;
@@ -156,7 +161,7 @@ export function dibujarTarjeta(canvas, datos) {
         texto(ctx, v, x + 50, y + 138, 190, 36, CUERPO(500));
       });
     }
-    y += 190;
+    y += fila.paso;
   }
 
   // Luna y firma al pie.

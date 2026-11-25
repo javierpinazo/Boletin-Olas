@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "¿Es buen día para remar en mar calmo en Lima sur y Callao?",
+  "description": "¿Es buen día para remar en mar calmo? Playas de todo el Perú.",
   "engines": {
     "node": ">=22"
   },
@@ -13,6 +13,7 @@
     "build": "node scripts/build-site.mjs",
     "serve": "node scripts/serve.mjs",
     "valores": "node scripts/valores-hoy.mjs",
-    "hoy": "node scripts/hoy.mjs"
+    "hoy": "node scripts/hoy.mjs",
+    "probar": "node job/run.js && node scripts/build-site.mjs && node scripts/serve.mjs --local"
   }
 }

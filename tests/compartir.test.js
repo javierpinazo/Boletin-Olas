@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { textoResumen, enlaceWhatsapp } from '../site/js/compartir.js';
+import { textoResumen, enlaceWhatsapp , disposicionPlayas } from '../site/js/compartir.js';
 
 const datos = {
   fecha: 'miércoles, 25 nov.',
@@ -35,4 +35,13 @@ test('enlaceWhatsapp: abre wa.me con el texto codificado', () => {
   const url = enlaceWhatsapp(datos);
   assert.match(url, /^https:\/\/wa\.me\/\?text=/);
   assert.equal(decodeURIComponent(url.split('text=')[1]), textoResumen(datos));
+});
+
+test('disposicionPlayas: hasta 4 como siempre; 5 y 6 en filas compactas que no tapan la luna', () => {
+  assert.deepEqual(disposicionPlayas(4), { paso: 190, alto: 170, cifras: true });
+  assert.deepEqual(disposicionPlayas(6), { paso: 122, alto: 106, cifras: false });
+  for (let n = 1; n <= 6; n += 1) {
+    const { paso, alto } = disposicionPlayas(n);
+    assert.ok(940 + (n - 1) * paso + alto <= 1690, String(n));
+  }
 });
