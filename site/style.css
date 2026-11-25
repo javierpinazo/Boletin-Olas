@@ -340,6 +340,15 @@ footer p { margin: 6px 0; }
 :root[data-tema="oceano"] .registro button[aria-pressed="true"],
 :root[data-tema="oceano"] .boton-ir.waze { color: #08131c; }
 
+/* Oleaje anómalo (DHN): escalón activo y titular con colores intensos (los mismos del cuadro hora a hora) */
+:root[data-tema="oceano"] .paso.activo { color: #08131c; outline-color: #e8f1f8; }
+:root[data-tema="oceano"] .paso.activo.verde { background: var(--c-verde); }
+:root[data-tema="oceano"] .paso.activo.amarillo { background: var(--c-ambar); }
+:root[data-tema="oceano"] .paso.activo.rojo { background: var(--c-rojo); }
+:root[data-tema="oceano"] .oleaje.verde .titular { color: #5fd394; }
+:root[data-tema="oceano"] .oleaje.amarillo .titular { color: #f2c14e; }
+:root[data-tema="oceano"] .oleaje.rojo .titular { color: #ff8a7a; }
+
 /* 1) Titular */
 :root[data-tema="oceano"] .titular-oceano { background: none; border: 0; padding: 6px 2px 0; }
 :root[data-tema="oceano"] .titular-oceano .sobre { margin: 0 0 4px; font-size: .85rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #8fe0b4; }
