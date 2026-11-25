@@ -9,6 +9,7 @@ import {
 } from './salidas.js';
 import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, proximas, trazoLuz } from './luna.js';
 import { textoResumen, enlaceWhatsapp, dibujarTarjeta } from './compartir.js';
+import { conCache, leerCache, guardarCache } from './cache.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -54,36 +55,50 @@ const estado = {
   actualizando: false, ultimoRefresco: 0, tempMar: null, climaMar: null, grifos: null, salidas: [], abiertas: new Set(), mensajeSalidas: '',
 };
 
-async function iniciar() {
+// Uso frecuente: lo pedido hace menos de 30 min (Open-Meteo, temperatura, grifos, clima) sale de la caché del
+// navegador sin volver a pedirse. El aviso del DHN se lee siempre (es un archivo pequeño y trae las alertas de
+// tsunami, que no deben esperar). Todo se pide en paralelo.
+async function iniciar({ forzar = false } = {}) {
   const raiz = document.getElementById('app');
   raiz.replaceChildren(el('p', { class: 'cargando', text: 'Consultando el mar y el aviso del DHN…' }));
+  const a = almacen();
   estado.config = await cargarJson('./config.json');
-  estado.dhn = await cargarJson('./data/dhn.json').catch(() => null);
-  estado.tempMar = await cargarJson('./data/temp-mar.json').catch(() => null);
-  estado.climaMar = await cargarJson('./clima-mar.json').catch(() => null);
-  estado.grifos = await cargarJson('./data/grifos.json').catch(() => null);
-  const resultados = await Promise.allSettled(estado.config.playas.map((p) => cargarMar(p)));
-  estado.mar = resultados.map((r) => (r.status === 'fulfilled' ? r.value : null));
-  estado.salidas = leerSalidas(almacen());
+  const json = (clave, url) => conCache(a, clave, () => cargarJson(url), { forzar }).then((r) => r.datos).catch(() => null);
+  const [dhn, tempMar, climaMar, grifos, ...mar] = await Promise.all([
+    cargarJson('./data/dhn.json').catch(() => null),
+    json('temp-mar', './data/temp-mar.json'),
+    json('clima-mar', './clima-mar.json'),
+    json('grifos', './data/grifos.json'),
+    ...estado.config.playas.map((p) => conCache(a, `mar:${p.id}:${p.lat},${p.lon}`, () => cargarMar(p), { forzar }).catch(() => null)),
+  ]);
+  Object.assign(estado, { dhn, tempMar, climaMar, grifos });
+  estado.mar = mar.map((m) => m?.datos ?? null);
+  estado.salidas = leerSalidas(a);
   estado.ahoraMs = Date.now();
-  estado.marMs = estado.ahoraMs;
+  const tiempos = mar.filter(Boolean).map((m) => m.t);
+  estado.marMs = tiempos.length ? Math.min(...tiempos) : estado.ahoraMs; // la consulta más antigua en uso
   estado.diaCargado = ahoraLima(estado.ahoraMs).slice(0, 10);
   pintar();
-  refrescar();
+  refrescar({ forzar });
 }
 
 // Pide a la VPS que relea el DHN y la temperatura del mar. El servidor decide: solo lo hace si el último dato
 // tiene 3 h o más (además del cron diario de las 6 a. m.). Si lo hizo, se vuelven a leer los archivos.
-async function refrescar() {
+// Si este navegador ya se lo pidió hace menos de 30 min, no se vuelve a pedir.
+async function refrescar({ forzar = false } = {}) {
+  const a = almacen();
   estado.ultimoRefresco = Date.now();
+  if (!forzar && leerCache(a, 'api-actualizar')) return;
   estado.actualizando = estadoDhn(estado.dhn, estado.ahoraMs, estado.config.umbrales) !== 'ok';
   if (estado.actualizando) pintar();
   try {
     const r = await fetch('/api/actualizar', { cache: 'no-store', signal: AbortSignal.timeout(100_000) });
+    if (r.ok) guardarCache(a, 'api-actualizar', true);
     if (r.ok && (await r.json()).actualizado) {
+      const fresco = (clave, url, actual) => conCache(a, clave, () => cargarJson(url), { forzar: true }).then((x) => x.datos).catch(() => actual);
       estado.dhn = await cargarJson('./data/dhn.json').catch(() => estado.dhn);
-      estado.tempMar = await cargarJson('./data/temp-mar.json').catch(() => estado.tempMar);
-      estado.grifos = await cargarJson('./data/grifos.json').catch(() => estado.grifos);
+      estado.tempMar = await fresco('temp-mar', './data/temp-mar.json', estado.tempMar);
+      estado.grifos = await fresco('grifos', './data/grifos.json', estado.grifos);
       estado.ahoraMs = Date.now();
     }
   } catch {
@@ -861,8 +876,8 @@ function pie(tsun) {
     const b = tsun.boletin;
     lineas.push(el('p', { class: 'gris', text: `Sismo ${b.magnitud ?? '?'} Mw ${b.lugar ?? ''}: sin tsunami en el litoral peruano (boletín ${b.numero}).` }));
   }
-  lineas.push(el('p', { class: 'gris', text: `Datos del DHN leídos: ${dhn ? `${fechaCorta(Date.parse(dhn.generadoEn))} ${horaCorta(Date.parse(dhn.generadoEn))}` : 'no disponible'} · Mar consultado: ${horaCorta(marMs)}` }));
-  lineas.push(el('p', { class: 'gris', text: 'Oleaje, viento, ráfagas y mareas son de modelo (Open-Meteo), no medidos en la orilla; varias playas pueden compartir la misma celda del modelo. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
+  const minutos = Math.max(0, Math.round((Date.now() - marMs) / 60_000));
+  lineas.push(el('p', { class: 'gris', text: `Datos del DHN leídos: ${dhn ? `${fechaCorta(Date.parse(dhn.generadoEn))} ${horaCorta(Date.parse(dhn.generadoEn))}` : 'no disponible'} · Mar consultado: ${horaCorta(marMs)}${minutos >= 1 ? ` (hace ${minutos} min)` : ''}` }));  lineas.push(el('p', { class: 'gris', text: 'Oleaje, viento, ráfagas y mareas son de modelo (Open-Meteo), no medidos en la orilla; varias playas pueden compartir la misma celda del modelo. Es una ayuda para decidir, no un permiso: manda lo que veas en la orilla y cualquier cierre de puerto. Antes de salir revisa dhn.mil.pe o la app MGP Tsunamis.' }));
   lineas.push(el('p', { class: 'gris' },
     el('a', { href: 'https://www.dhn.mil.pe/portal/', text: 'dhn.mil.pe', rel: 'noopener' }), ' · ',
     el('a', { href: 'https://www.dhn.mil.pe/portal/boletin-diario-condiciones-oceanograficas', text: 'Boletín oceanográfico diario', rel: 'noopener' }), ' · ',

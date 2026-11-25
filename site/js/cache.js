@@ -1,0 +1,38 @@
+// Caché en el navegador (localStorage) para el uso frecuente: si un dato se pidió hace menos de `maxMs`,
+// se usa el guardado y no se vuelve a pedir. Si el almacenamiento no está disponible (modo privado), se pide siempre.
+const PREFIJO = 'cache:v1:';
+
+export const MINUTOS_CACHE = 30;
+export const MAX_CACHE_MS = MINUTOS_CACHE * 60_000;
+
+export function leerCache(almacen, clave, { maxMs = MAX_CACHE_MS, ahora = Date.now() } = {}) {
+  try {
+    const crudo = almacen?.getItem(PREFIJO + clave);
+    if (!crudo) return null;
+    const { t, datos } = JSON.parse(crudo);
+    if (typeof t !== 'number' || ahora - t >= maxMs || ahora < t) return null;
+    return { t, datos };
+  } catch {
+    return null;
+  }
+}
+
+export function guardarCache(almacen, clave, datos, ahora = Date.now()) {
+  try {
+    almacen?.setItem(PREFIJO + clave, JSON.stringify({ t: ahora, datos }));
+    return true;
+  } catch {
+    return false; // sin espacio o sin almacenamiento: se seguirá pidiendo
+  }
+}
+
+// Devuelve { datos, t, desdeCache }: el guardado si está vigente; si no (o con forzar), lo pide y lo guarda.
+export async function conCache(almacen, clave, pedir, { forzar = false, maxMs = MAX_CACHE_MS, ahora = Date.now() } = {}) {
+  if (!forzar) {
+    const guardado = leerCache(almacen, clave, { maxMs, ahora });
+    if (guardado) return { ...guardado, desdeCache: true };
+  }
+  const datos = await pedir();
+  guardarCache(almacen, clave, datos, ahora);
+  return { datos, t: ahora, desdeCache: false };
+}
