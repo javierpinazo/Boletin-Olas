@@ -3,33 +3,32 @@ import assert from 'node:assert/strict';
 import { textoResumen, enlaceWhatsapp } from '../site/js/compartir.js';
 
 const datos = {
-  fecha: 'miércoles, 25 nov',
+  fecha: 'miércoles, 25 nov.',
   titular: 'Hoy se rema\ncon cuidado',
-  oleaje: 'Oleaje anómalo medio (DHN): medio de 6 a 17 h',
-  mar: 'Mar 24,6 °C (+6,8 °C sobre lo habitual)',
-  playas: [
-    { nombre: 'Yuyos', color: 'amarillo', texto: 'Con cuidado 9–17 h', detalle: 'ola 0,6 m · viento 15 km/h · ráfagas 36 km/h' },
-    { nombre: 'San Bartolo', color: 'gris', texto: 'Sin datos', detalle: null },
-  ],
-  pie: 'Luna llena',
+  mejor: 'Yuyos, 9–17 h',
+  oleaje: { texto: 'Medio', color: 'amarillo' },
+  mar: { actual: '24,6', dif: '+6,8 °C' },
+  playas: [{ nombre: 'Yuyos', color: 'amarillo', estado: '9–17 h', ola: '0,6 m', viento: '15 km/h', rafaga: '36 km/h' }],
+  luna: { nombre: 'Luna llena', p: 0.5 },
   url: 'https://olaspaddle.duckdns.org',
+  firma: { texto: 'Soluciones: Automatizate 360', url: 'https://ejemplo.pe' },
 };
 
-test('textoResumen: titular en una línea, oleaje del DHN, temperatura y detalle por playa', () => {
+test('textoResumen: solo el veredicto y los enlaces (lo demás va en la imagen)', () => {
   assert.equal(textoResumen(datos), [
-    'Boletín Olas · miércoles, 25 nov',
-    'Hoy se rema con cuidado',
-    'Oleaje anómalo medio (DHN): medio de 6 a 17 h',
-    'Mar 24,6 °C (+6,8 °C sobre lo habitual)',
-    '• Yuyos: Con cuidado 9–17 h · ola 0,6 m · viento 15 km/h · ráfagas 36 km/h',
-    '• San Bartolo: Sin datos',
-    'Luna llena',
-    'https://olaspaddle.duckdns.org',
+    'Boletín Olas, miércoles, 25 nov.: hoy se rema con cuidado. Mejor opción: Yuyos, 9–17 h.',
+    'Detalle hora a hora: https://olaspaddle.duckdns.org',
+    'Soluciones: Automatizate 360 · https://ejemplo.pe',
   ].join('\n'));
 });
 
-test('textoResumen: sin temperatura ni luna no deja líneas vacías', () => {
-  assert.doesNotMatch(textoResumen({ ...datos, mar: null, pie: '' }), /\n\n/);
+test('textoResumen: sin mejor opción ni enlace de la firma', () => {
+  const t = textoResumen({ ...datos, titular: 'Hoy no\nconviene remar', mejor: null, firma: { texto: 'Soluciones: Automatizate 360', url: null } });
+  assert.equal(t, [
+    'Boletín Olas, miércoles, 25 nov.: hoy no conviene remar.',
+    'Detalle hora a hora: https://olaspaddle.duckdns.org',
+    'Soluciones: Automatizate 360',
+  ].join('\n'));
 });
 
 test('enlaceWhatsapp: abre wa.me con el texto codificado', () => {
