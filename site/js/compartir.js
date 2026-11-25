@@ -3,12 +3,14 @@
 
 export const COLOR_PUNTO = { verde: '#5fd394', amarillo: '#f2c14e', naranja: '#f2c14e', rojo: '#ff8a7a', gris: '#a9c2d6' };
 
-// datos: { fecha, titular, playas: [{ nombre, color, texto }], pie, url }
+// datos: { fecha, titular, oleaje, mar, playas: [{ nombre, color, texto, detalle }], pie, url }
 export function textoResumen(datos) {
   return [
     `Boletín Olas · ${datos.fecha}`,
-    datos.titular,
-    ...datos.playas.map((p) => `• ${p.nombre}: ${p.texto}`),
+    datos.titular.replace(/\n/g, ' '),
+    datos.oleaje,
+    datos.mar,
+    ...datos.playas.map((p) => `• ${p.nombre}: ${p.texto}${p.detalle ? ` · ${p.detalle}` : ''}`),
     datos.pie,
     datos.url,
   ].filter(Boolean).join('\n');
@@ -18,6 +20,7 @@ export const enlaceWhatsapp = (datos) => `https://wa.me/?text=${encodeURICompone
 
 const ANCHO = 1080;
 const ALTO = 1350;
+const MARGEN = 80;
 
 function redondeado(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -29,23 +32,34 @@ function redondeado(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Escribe el texto achicando la letra hasta que quepa en `ancho`.
+function textoAjustado(ctx, texto, x, y, ancho, tamano, armarFuente) {
+  let t = tamano;
+  ctx.font = armarFuente(t);
+  while (t > 20 && ctx.measureText(texto).width > ancho) {
+    t -= 2;
+    ctx.font = armarFuente(t);
+  }
+  ctx.fillText(texto, x, y);
+}
+
 // Dibuja la tarjeta 1080×1350 (formato vertical de redes) en el canvas dado.
 export function dibujarTarjeta(canvas, datos) {
   canvas.width = ANCHO;
   canvas.height = ALTO;
   const ctx = canvas.getContext('2d');
-  const titulo = '700 {t}px "Space Grotesk", "Segoe UI", system-ui, sans-serif';
-  const cuerpo = '{p} {t}px Inter, "Segoe UI", system-ui, sans-serif';
-  const fuente = (base, t, p = 400) => base.replace('{t}', t).replace('{p}', p);
+  const titulo = (t) => `700 ${t}px "Space Grotesk", "Segoe UI", system-ui, sans-serif`;
+  const cuerpo = (p) => (t) => `${p} ${t}px Inter, "Segoe UI", system-ui, sans-serif`;
+  const util = ANCHO - MARGEN * 2;
 
   ctx.fillStyle = '#0e4f7a';
   ctx.fillRect(0, 0, ANCHO, ALTO);
   // Ola decorativa al pie.
   ctx.fillStyle = '#0b3f63';
   ctx.beginPath();
-  ctx.moveTo(0, ALTO - 210);
-  ctx.bezierCurveTo(200, ALTO - 290, 380, ALTO - 140, 560, ALTO - 210);
-  ctx.bezierCurveTo(740, ALTO - 280, 900, ALTO - 170, ANCHO, ALTO - 230);
+  ctx.moveTo(0, ALTO - 170);
+  ctx.bezierCurveTo(200, ALTO - 250, 380, ALTO - 100, 560, ALTO - 170);
+  ctx.bezierCurveTo(740, ALTO - 240, 900, ALTO - 130, ANCHO, ALTO - 190);
   ctx.lineTo(ANCHO, ALTO);
   ctx.lineTo(0, ALTO);
   ctx.closePath();
@@ -53,38 +67,53 @@ export function dibujarTarjeta(canvas, datos) {
 
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#c6dcec';
-  ctx.font = fuente(cuerpo, 40, 600);
-  ctx.fillText(`BOLETÍN OLAS · ${datos.fecha.toUpperCase()}`, 80, 90);
+  textoAjustado(ctx, `BOLETÍN OLAS · ${datos.fecha.toUpperCase()}`, MARGEN, 70, util, 36, cuerpo(600));
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = fuente(titulo, 104);
   const lineas = datos.titular.split('\n');
-  lineas.forEach((l, i) => ctx.fillText(l, 80, 170 + i * 112));
+  lineas.forEach((l, i) => textoAjustado(ctx, l, MARGEN, 130 + i * 100, util, 92, titulo));
+  let y = 130 + lineas.length * 100 + 30;
 
-  let y = 200 + lineas.length * 112 + 40;
+  // Oleaje anómalo y temperatura del mar.
+  const info = [datos.oleaje, datos.mar].filter(Boolean);
+  if (info.length) {
+    const alto = 30 + info.length * 56;
+    ctx.fillStyle = 'rgba(8,19,28,0.35)';
+    redondeado(ctx, MARGEN, y, util, alto, 24);
+    ctx.fill();
+    ctx.fillStyle = '#e8f1f8';
+    info.forEach((t, i) => textoAjustado(ctx, t, MARGEN + 30, y + 22 + i * 56, util - 60, 36, cuerpo(500)));
+    y += alto + 24;
+  }
+
+  // Playas: estado a la derecha y, debajo del nombre, sus cifras resumidas.
+  const hueco = ALTO - 150 - y;
+  const fila = Math.min(150, Math.floor(hueco / Math.max(1, datos.playas.length)) - 12);
   for (const p of datos.playas) {
     ctx.fillStyle = 'rgba(255,255,255,0.1)';
-    redondeado(ctx, 80, y, ANCHO - 160, 130, 28);
+    redondeado(ctx, MARGEN, y, util, fila, 24);
     ctx.fill();
     ctx.fillStyle = COLOR_PUNTO[p.color] ?? COLOR_PUNTO.gris;
     ctx.beginPath();
-    ctx.arc(130, y + 65, 18, 0, Math.PI * 2);
+    ctx.arc(MARGEN + 44, y + 44, 15, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ffffff';
     ctx.textBaseline = 'middle';
-    ctx.font = fuente(cuerpo, 46, 600);
-    ctx.fillText(p.nombre, 175, y + 65);
-    ctx.font = fuente(cuerpo, 44, 700);
-    const w = ctx.measureText(p.texto).width;
-    ctx.fillText(p.texto, ANCHO - 120 - w, y + 65);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = cuerpo(700)(40);
+    const anchoEstado = ctx.measureText(p.texto).width;
+    ctx.fillText(p.texto, ANCHO - MARGEN - 30 - anchoEstado, y + 44);
+    textoAjustado(ctx, p.nombre, MARGEN + 76, y + 44, util - 140 - anchoEstado, 42, cuerpo(600));
+    if (p.detalle) {
+      ctx.fillStyle = '#c6dcec';
+      textoAjustado(ctx, p.detalle, MARGEN + 76, y + fila - 38, util - 106, 32, cuerpo(400));
+    }
     ctx.textBaseline = 'top';
-    y += 154;
+    y += fila + 12;
   }
 
   ctx.fillStyle = '#e8f1f8';
-  ctx.font = fuente(cuerpo, 40, 500);
-  ctx.fillText(datos.pie, 80, ALTO - 150);
+  if (datos.pie) textoAjustado(ctx, datos.pie, MARGEN, ALTO - 120, util, 36, cuerpo(500));
   ctx.fillStyle = '#c6dcec';
-  ctx.font = fuente(cuerpo, 36, 400);
-  ctx.fillText(datos.url.replace(/^https?:\/\//, ''), 80, ALTO - 95);
+  ctx.font = cuerpo(400)(32);
+  ctx.fillText(datos.url.replace(/^https?:\/\//, ''), MARGEN, ALTO - 70);
 }

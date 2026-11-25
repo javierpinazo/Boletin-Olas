@@ -4,25 +4,32 @@ import { textoResumen, enlaceWhatsapp } from '../site/js/compartir.js';
 
 const datos = {
   fecha: 'miércoles, 25 nov',
-  titular: 'Hoy sí\nse rema',
-  playas: [{ nombre: 'Yuyos', color: 'verde', texto: '7–11 h' }, { nombre: 'San Bartolo', color: 'rojo', texto: 'No apto' }],
-  pie: 'Mar 25,1 °C · Luna llena',
+  titular: 'Hoy se rema\ncon cuidado',
+  oleaje: 'Oleaje anómalo medio (DHN): medio de 6 a 17 h',
+  mar: 'Mar 24,6 °C (+6,8 °C sobre lo habitual)',
+  playas: [
+    { nombre: 'Yuyos', color: 'amarillo', texto: 'Con cuidado 9–17 h', detalle: 'ola 0,6 m · viento 15 km/h · ráfagas 36 km/h' },
+    { nombre: 'San Bartolo', color: 'gris', texto: 'Sin datos', detalle: null },
+  ],
+  pie: 'Luna llena',
   url: 'https://olaspaddle.duckdns.org',
 };
 
-test('textoResumen: fecha, titular, una línea por playa, pie y enlace', () => {
+test('textoResumen: titular en una línea, oleaje del DHN, temperatura y detalle por playa', () => {
   assert.equal(textoResumen(datos), [
     'Boletín Olas · miércoles, 25 nov',
-    'Hoy sí\nse rema',
-    '• Yuyos: 7–11 h',
-    '• San Bartolo: No apto',
-    'Mar 25,1 °C · Luna llena',
+    'Hoy se rema con cuidado',
+    'Oleaje anómalo medio (DHN): medio de 6 a 17 h',
+    'Mar 24,6 °C (+6,8 °C sobre lo habitual)',
+    '• Yuyos: Con cuidado 9–17 h · ola 0,6 m · viento 15 km/h · ráfagas 36 km/h',
+    '• San Bartolo: Sin datos',
+    'Luna llena',
     'https://olaspaddle.duckdns.org',
   ].join('\n'));
 });
 
-test('textoResumen: omite el pie si no hay datos de mar ni luna', () => {
-  assert.doesNotMatch(textoResumen({ ...datos, pie: '' }), /\n\n/);
+test('textoResumen: sin temperatura ni luna no deja líneas vacías', () => {
+  assert.doesNotMatch(textoResumen({ ...datos, mar: null, pie: '' }), /\n\n/);
 });
 
 test('enlaceWhatsapp: abre wa.me con el texto codificado', () => {

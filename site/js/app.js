@@ -140,17 +140,24 @@ const colorNivel = (nivel) => COLOR_NIVEL[nivel] ?? 'gris';
 
 // Medidor del oleaje anómalo: 4 escalones (Normal / Leve / Medio / Alto) con el del día resaltado.
 // Sin aviso, o con aviso "condiciones normales", el día es normal.
-const PASOS_OLEAJE = [['normal', 'Normal', 'verde'], ['ligero', 'Leve', 'verde'], ['moderado', 'Medio', 'amarillo'], ['fuerte', 'Alto', 'rojo']];
+const PASOS_OLEAJE = [['normal', 'Oleaje Normal', 'verde'], ['ligero', 'Leve', 'verde'], ['moderado', 'Medio', 'amarillo'], ['fuerte', 'Alto', 'rojo']];
 
-function bloqueOleaje(oleaje) {
+// Nivel de oleaje anómalo del día según el aviso del DHN (lo usan el bloque y "Comparte el día").
+function infoOleaje(oleaje) {
   const { dhn, ahoraMs, config } = estado;
   const sinDatos = !oleaje && estadoDhn(dhn, ahoraMs, config.umbrales) !== 'ok';
   const orden = ['normal', 'ligero', 'moderado', 'fuerte', 'muy fuerte'];
   const nivelDia = oleaje
     ? oleaje.grupos.map((g) => g.nivelMax).filter(Boolean).reduce((a, b) => (orden.indexOf(b) > orden.indexOf(a) ? b : a), 'normal')
     : 'normal';
+  const normal = nivelDia === 'normal';
+  const unico = oleaje && oleaje.grupos.every((g) => g.texto === oleaje.grupos[0].texto);
+  return { sinDatos, nivelDia, normal, unico };
+}
+
+function bloqueOleaje(oleaje) {
+  const { sinDatos, nivelDia, normal } = infoOleaje(oleaje);
   const actual = nivelDia === 'muy fuerte' ? 'fuerte' : nivelDia;
-  const normal = actual === 'normal';
   const color = colorNivel(nivelDia);
   const titular = sinDatos
     ? 'Sin datos del aviso del DHN'
@@ -283,7 +290,7 @@ function pintar() {
       return t;
     }),
     oceano ? cuadroHoras(resultados) : null,
-    oceano ? compartirDia(resultados) : null,
+    oceano ? compartirDia(resultados, oleaje) : null,
     oceano ? instalarApp() : null,
     panelSalidas(),
     seccionGrifos(),
@@ -337,29 +344,64 @@ function cuadroHoras(resultados) {
 
 const ETIQUETA_OCEANO = { verde: 'Apto', amarillo: 'Con cuidado', naranja: 'Con cuidado', rojo: 'No apto' };
 
+// Cifras de una playa para compartir: lo que queda del día (o el día entero si ya pasó la ventana).
+function detallePlaya(r) {
+  const base = r.horas.length ? r.horas : r.horasDia;
+  const olas = base.map((h) => h.dato.hs).filter((v) => typeof v === 'number');
+  if (!olas.length) return null;
+  const viento = Math.max(...base.map((h) => h.dato.vientoKmh ?? 0));
+  const rafaga = Math.max(...base.map((h) => h.dato.rafagaKmh ?? h.dato.vientoKmh ?? 0));
+  return `ola ${num1(olas.reduce((a, b) => a + b, 0) / olas.length)} m · viento ${Math.round(viento)} km/h · ráfagas ${Math.round(rafaga)} km/h`;
+}
+
+function lineaOleaje(oleaje) {
+  const { sinDatos, nivelDia, normal, unico } = infoOleaje(oleaje);
+  if (sinDatos) return 'Oleaje anómalo (DHN): sin datos del aviso';
+  if (normal) return 'Oleaje normal: sin oleaje anómalo (DHN)';
+  const base = `Oleaje anómalo ${ETIQUETA_NIVEL[nivelDia].toLowerCase()} (DHN)`;
+  return unico ? `${base}: ${oleaje.grupos[0].texto.toLowerCase()}` : base;
+}
+
+function lineaTemperatura() {
+  const { tempMar, climaMar, config } = estado;
+  // Igual que el bloque de temperatura: promedio de las playas, actual frente a lo habitual de ese día.
+  const medidas = config.playas.map((p) => {
+    const t = tempMar?.playas?.[p.id];
+    return t ? { actual: t.actual, normal: climaMar?.playas?.[p.id]?.[diaDelAnio(t.fecha)] } : null;
+  }).filter(Boolean);
+  if (!medidas.length) return null;
+  const actual = medidas.reduce((s, m) => s + m.actual, 0) / medidas.length;
+  if (!medidas.every((m) => typeof m.normal === 'number')) return `Mar ${num1(actual)} °C`;
+  const dif = Math.round((actual - medidas.reduce((s, m) => s + m.normal, 0) / medidas.length) * 10) / 10;
+  const comparado = Math.abs(dif) < 0.5 ? 'dentro de lo habitual' : `${dif > 0 ? '+' : '−'}${num1(Math.abs(dif))} °C ${dif > 0 ? 'sobre' : 'bajo'} lo habitual`;
+  return `Mar ${num1(actual)} °C (${comparado})`;
+}
+
 // Resumen del día para la imagen y el texto de "Comparte el día".
-function resumenParaCompartir(resultados) {
+function resumenParaCompartir(resultados, oleaje) {
   const dia = estadoDia(resultados);
   const quien = NOMBRE_DIA[estado.dia];
   const titular = dia.tipo === 'mejor'
     ? (dia.mejor.color === 'verde' ? `${quien} sí\nse rema` : `${quien} se rema\ncon cuidado`)
     : dia.tipo === 'sin-horas' ? `${quien} ya no\nquedan horas` : `${quien} no\nconviene remar`;
-  const playas = resultados.map((r) => {
-    if (r.estado === 'sin-mar') return { nombre: r.playa.nombre, color: 'gris', texto: 'Sin datos' };
-    if (r.bloque) return { nombre: r.playa.nombre, color: r.color, texto: `${r.bloque.desde}–${r.bloque.hasta} h` };
-    if (r.estado !== 'ok') return { nombre: r.playa.nombre, color: 'gris', texto: ETIQUETA_ESTADO[r.estado] };
+  const estadoPlaya = (r) => {
+    if (r.estado === 'sin-mar') return { color: 'gris', texto: 'Sin datos' };
+    if (r.bloque) return { color: r.color, texto: `${ETIQUETA_OCEANO[r.color]} ${r.bloque.desde}–${r.bloque.hasta} h` };
+    if (r.estado !== 'ok') return { color: 'gris', texto: ETIQUETA_ESTADO[r.estado] };
     const d = r.grado ? describirSinBloque(r.grado, r.limitante) : { color: r.color, chip: ETIQUETA[r.color] };
-    return { nombre: r.playa.nombre, color: d.color, texto: ETIQUETA_OCEANO[d.color] ?? d.chip };
-  });
-  const temps = Object.values(estado.tempMar?.playas ?? {}).map((t) => t.actual).filter((n) => typeof n === 'number');
+    return { color: d.color, texto: ETIQUETA_OCEANO[d.color] ?? d.chip };
+  };
+  const playas = resultados.map((r) => ({ nombre: r.playa.nombre, ...estadoPlaya(r), detalle: r.estado === 'sin-mar' ? null : detallePlaya(r) }));
   const ms = Date.parse(`${fechaDelDia(estado.dia)}T12:00:00-05:00`);
   const luna = FASES[indiceFase(posicionCiclo(ms))];
-  const pie = [temps.length ? `Mar ${num1(temps.reduce((a, b) => a + b, 0) / temps.length)} °C` : null, luna].filter(Boolean).join(' · ');
-  return { fecha: fmt(ms, { weekday: 'long', day: 'numeric', month: 'short' }), titular, playas, pie, url: location.origin };
+  return {
+    fecha: fmt(ms, { weekday: 'long', day: 'numeric', month: 'short' }),
+    titular, oleaje: lineaOleaje(oleaje), mar: lineaTemperatura(), playas, pie: luna, url: location.origin,
+  };
 }
 
-function compartirDia(resultados) {
-  const datos = resumenParaCompartir(resultados);
+function compartirDia(resultados, oleaje) {
+  const datos = resumenParaCompartir(resultados, oleaje);
   const lienzo = el('canvas', { class: 'tarjeta-compartir', role: 'img', 'aria-label': textoResumen(datos) });
   dibujarTarjeta(lienzo, datos);
   // Si la fuente de títulos aún no llegó, se redibuja cuando esté lista.
