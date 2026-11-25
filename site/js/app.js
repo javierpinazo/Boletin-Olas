@@ -829,8 +829,12 @@ function seccionGrifos() {
   const candidatos = [...grifos.favoritos.filter((g) => !g.sinPrecio), ...grifos.zonas.flatMap((z) => z.grifos)];
   const referencia = candidatos.length ? Math.min(...candidatos.map((g) => g.precio)) : null;
   const generado = Date.parse(grifos.generadoEn);
-  return el('section', { class: 'grifos' },
-    el('h2', { text: `Combustible · ${grifos.producto}` }),
+  // Plegable: cerrado de entrada; se recuerda si lo abriste mientras la página siga abierta (pintar() rehace todo).
+  const cabecera = el('summary', {},
+    el('span', { class: 'grifos-cabecera' },
+      el('h2', { text: `Combustible · ${grifos.producto}` }),
+      referencia !== null ? el('span', { class: 'grifos-desde', text: `Desde ${soles(referencia)}` }) : null));
+  const plegable = el('details', estado.grifosAbierto ? { open: '' } : {}, cabecera,
     referencia !== null ? el('p', { class: 'resumen', text: `El más barato de tus opciones: ${soles(referencia)} por ${grifos.unidad}. Mediana en Lima: ${soles(grifos.medianaLima)}.` }) : null,
     el('h3', { text: 'Tus grifos' }),
     el('ul', {}, grifos.favoritos.map((g) => filaGrifo(g, referencia))),
@@ -842,6 +846,8 @@ function seccionGrifos() {
     el('ul', {}, grifos.lima.map((g) => filaGrifo(g, referencia))),
     el('p', { class: 'gris pequeno', text: `Precio por ${grifos.unidad}, declarado por cada grifo a Osinergmin (la fuente de Facilito). Mira el cartel del surtidor antes de cargar. Leído el ${fechaCorta(generado)} ${horaCorta(generado)}.` }),
     el('p', { class: 'gris pequeno' }, el('a', { href: 'https://www.facilito.gob.pe/facilito/', text: 'Abrir Facilito', rel: 'noopener' })));
+  plegable.addEventListener('toggle', () => { estado.grifosAbierto = plegable.open; });
+  return el('section', { class: 'grifos' }, plegable);
 }
 
 function pie(tsun) {
