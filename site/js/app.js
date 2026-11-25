@@ -434,7 +434,11 @@ function compartirDia(resultados, oleaje) {
   const lienzo = el('canvas', { class: 'tarjeta-compartir', role: 'img', 'aria-label': textoResumen(datos) });
   dibujarTarjeta(lienzo, datos);
   // Si la fuente de títulos aún no llegó, se redibuja cuando esté lista.
-  document.fonts?.ready.then(() => dibujarTarjeta(lienzo, datos)).catch(() => {});
+  // (el canvas no espera a las fuentes como el CSS: se cargan explícitamente)
+  if (document.fonts?.load) {
+    Promise.all(['700 100px "Space Grotesk"', '400 40px Inter', '700 40px Inter'].map((f) => document.fonts.load(f)))
+      .then(() => dibujarTarjeta(lienzo, datos)).catch(() => {});
+  }
   const nombreArchivo = `boletin-olas-${fechaDelDia(estado.dia)}.png`;
   const conImagen = (fn) => lienzo.toBlob((blob) => blob && fn(blob), 'image/png');
   const whatsapp = el('a', { class: 'boton-oceano verde', href: enlaceWhatsapp(datos), target: '_blank', rel: 'noopener noreferrer', text: 'WhatsApp' });

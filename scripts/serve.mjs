@@ -14,6 +14,7 @@ const ORIGEN = process.env.OLAS_ORIGEN ?? 'https://olaspaddle.duckdns.org';
 const TIPOS = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2', '.png': 'image/png', '.txt': 'text/plain; charset=utf-8',
 };
 
 const esDeServidor = (ruta) => ruta === '/api/actualizar' || /^\/data\/[\w-]+\.json$/.test(ruta);

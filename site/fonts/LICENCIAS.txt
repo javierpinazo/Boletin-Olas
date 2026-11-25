@@ -1,0 +1,8 @@
+Fuentes servidas desde este sitio (subconjunto "latin" en WOFF2, tal como lo distribuye Google Fonts).
+Ambas se publican bajo la SIL Open Font License, versión 1.1: https://openfontlicense.org
+
+inter-latin.woff2
+  Inter — Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)
+
+space-grotesk-latin.woff2
+  Space Grotesk — Copyright 2020 The Space Grotesk Project Authors (https://github.com/floriankarsten/space-grotesk)

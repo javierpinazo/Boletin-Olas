@@ -4,7 +4,6 @@
 (function () {
   var CLAVE = 'tema';
   var TEMAS = ['clasico', 'oceano'];
-  var FUENTES = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap';
   var raiz = document.documentElement;
 
   // <html data-solo-tema="oceano"> publica un único tema: se ignora la elección guardada y se oculta el botón.
@@ -25,19 +24,9 @@
     try { window.localStorage.setItem(CLAVE, tema); } catch (e) { /* modo privado: solo dura esta visita */ }
   }
 
-  // Las fuentes de Google solo se piden en modo océano: el clásico queda exactamente como estaba.
-  function fuentes(tema) {
-    if (tema !== 'oceano' || document.getElementById('fuentes-oceano')) return;
-    var link = document.createElement('link');
-    link.id = 'fuentes-oceano';
-    link.rel = 'stylesheet';
-    link.href = FUENTES;
-    document.head.appendChild(link);
-  }
-
+  // Las fuentes (Inter, Space Grotesk) están en style.css y se sirven desde el propio sitio (fonts/).
   function aplicar(tema) {
     raiz.setAttribute('data-tema', tema);
-    fuentes(tema);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', tema === 'oceano' ? '#0e4f7a' : '#0b5ea8');
     var boton = document.getElementById('cambiar-tema');
