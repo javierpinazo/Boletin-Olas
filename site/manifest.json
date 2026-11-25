@@ -4,8 +4,15 @@
   "description": "¿Es buen día para remar en mar calmo en Lima sur y Callao?",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f4f7fa",
-  "theme_color": "#0b5ea8",
+  "background_color": "#08131c",
+  "theme_color": "#0e4f7a",
   "lang": "es",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }

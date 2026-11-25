@@ -7,7 +7,12 @@
   var FUENTES = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap';
   var raiz = document.documentElement;
 
+  // <html data-solo-tema="oceano"> publica un único tema: se ignora la elección guardada y se oculta el botón.
+  // Para volver a ofrecer los dos temas basta con quitar ese atributo de index.html.
+  var fijo = raiz.getAttribute('data-solo-tema');
+
   function leer() {
+    if (TEMAS.indexOf(fijo) >= 0) return fijo;
     try {
       var v = window.localStorage.getItem(CLAVE);
       return TEMAS.indexOf(v) >= 0 ? v : 'clasico';
@@ -50,6 +55,10 @@
     aplicar(leer());
     var boton = document.getElementById('cambiar-tema');
     if (!boton) return;
+    if (fijo) {
+      boton.hidden = true;
+      return;
+    }
     boton.addEventListener('click', function () {
       var nuevo = raiz.getAttribute('data-tema') === 'oceano' ? 'clasico' : 'oceano';
       guardar(nuevo);

@@ -247,6 +247,7 @@ footer p { margin: 6px 0; }
 }
 .boton-tema:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
 .boton-tema .icono-sol { display: none; }
+.boton-tema[hidden], [data-solo-tema] .boton-tema { display: none; }
 
 /* =====================================================================
    Tema "Modo océano" (oscuro). Todo va bajo :root[data-tema="oceano"]: el tema clásico no cambia.
