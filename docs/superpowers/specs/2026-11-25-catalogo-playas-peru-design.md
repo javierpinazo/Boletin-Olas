@@ -68,9 +68,11 @@ Un archivo versionado. Por playa: `id` (estable, no se reutiliza), `nombre`, `re
 - Lista de `id` en el navegador. Máximo **6**. La imagen para compartir hoy tiene espacio para 4: con 5 o 6
   usa filas compactas (nombre, color y horario, sin las cifras de ola y viento).
 - Se puede agregar, quitar y reordenar. Un `id` guardado que ya no exista en el catálogo se ignora.
-- **Usuario actual** (tiene salidas o datos guardados de la app y ninguna lista): empieza con las 4 de hoy.
-- **Usuario nuevo:** ve la pantalla "Agrega tu playa"; no se asume ninguna. Las alertas de tsunami y el aviso
-  de datos del DHN desactualizados se muestran aunque no tenga playas.
+- **Sin playas elegidas** (usuario nuevo, o quien quitó todas) — cambio del 2026-11-26, pedido tras publicar: el
+  reporte se ve de inmediato con las 4 de Lima y Callao y un aviso arriba, "Estás viendo playas de Lima y Callao",
+  con el botón "Elegir mis playas". El panel empieza vacío; al elegir, se muestran las suyas y el aviso desaparece.
+  Las 4 de ejemplo no se guardan como elección. Reemplaza la pantalla inicial "Agrega tu playa" y la distinción
+  entre usuario actual y nuevo.
 - Si no se puede guardar (modo privado), la selección dura mientras la página esté abierta y se avisa.
 
 ### 3. Agregar playa

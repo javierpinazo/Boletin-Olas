@@ -9,6 +9,7 @@
 
 ## Catálogo y "Mis playas"
 
+- Quien no ha elegido ve las 4 de Lima y Callao, con un aviso para elegir las suyas.
 - Cada remero elige hasta 6 playas (por nombre, región o "Cerca de mí"). Quedan en su navegador; su ubicación no se
   guarda ni se envía.
 - **Agregar una playa:** añádela en `site/playas.json` (de norte a sur) con `id` nuevo, `region`, coordenadas en la

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_PLAYAS, CLAVE_MIS_PLAYAS, ORIGINALES, iniciarMisPlayas, agregar, quitar, mover, guardarMisPlayas,
+  MAX_PLAYAS, CLAVE_MIS_PLAYAS, ORIGINALES, leerMisPlayas, playasAVer, agregar, quitar, mover, guardarMisPlayas,
 } from '../site/js/mis-playas.js';
 
 function almacen(inicial = {}) {
@@ -15,34 +15,34 @@ function almacen(inicial = {}) {
 }
 const CATALOGO = [...ORIGINALES, 'mancora', 'lobitos', 'huanchaco', 'ilo', 'colan'];
 
-test('usuario nuevo: lista vacía, y sigue vacía aunque después ya haya caché', () => {
+test('sin nada elegido: lista vacía y no se guarda nada', () => {
   const a = almacen();
-  assert.deepEqual(iniciarMisPlayas(a, CATALOGO), []);
-  a.setItem('cache:v1:temp-mar', '{}');
-  assert.deepEqual(iniciarMisPlayas(a, CATALOGO), []);
+  assert.deepEqual(leerMisPlayas(a, CATALOGO), []);
+  assert.equal(a.length, 0);
 });
 
-test('usuario actual con salidas o con caché: empieza con las 4 originales', () => {
-  assert.deepEqual(iniciarMisPlayas(almacen({ 'boletin-olas:salidas:v1': '[]' }), CATALOGO), ORIGINALES);
-  assert.deepEqual(iniciarMisPlayas(almacen({ 'cache:v1:grifos': '{}' }), CATALOGO), ORIGINALES);
+test('playasAVer: sin elección propia se ven las 4 de ejemplo; con elección, las suyas', () => {
+  assert.deepEqual(playasAVer([]), ORIGINALES);
+  assert.deepEqual(playasAVer(['mancora']), ['mancora']);
 });
 
 test('lista guardada: se quitan ids inexistentes y repetidos, y se corta en 6', () => {
-  assert.deepEqual(iniciarMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: '["x","mancora","mancora"]' }), CATALOGO), ['mancora']);
+  assert.deepEqual(leerMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: '["x","mancora","mancora"]' }), CATALOGO), ['mancora']);
   const ocho = CATALOGO.slice(0, 8);
-  assert.deepEqual(iniciarMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: JSON.stringify(ocho) }), CATALOGO), ocho.slice(0, MAX_PLAYAS));
+  assert.deepEqual(leerMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: JSON.stringify(ocho) }), CATALOGO), ocho.slice(0, MAX_PLAYAS));
 });
 
-test('lista corrupta: no lanza y devuelve vacío', () => {
-  assert.deepEqual(iniciarMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: '{no' }), CATALOGO), []);
-  assert.deepEqual(iniciarMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: '{"a":1}' }), CATALOGO), []);
+test('lista corrupta o vacía guardada: no lanza y devuelve vacío', () => {
+  for (const crudo of ['{no', '{"a":1}', '[]', '["x"]']) {
+    assert.deepEqual(leerMisPlayas(almacen({ [CLAVE_MIS_PLAYAS]: crudo }), CATALOGO), [], crudo);
+  }
 });
 
 test('almacenamiento ausente o bloqueado: no rompe', () => {
   const lanza = () => { throw new Error('bloqueado'); };
   const bloqueado = { getItem: lanza, setItem: lanza, key: lanza, length: 0 };
   for (const a of [undefined, bloqueado]) {
-    assert.deepEqual(iniciarMisPlayas(a, CATALOGO), []);
+    assert.deepEqual(leerMisPlayas(a, CATALOGO), []);
     assert.equal(guardarMisPlayas(a, ['mancora']), false);
   }
   assert.equal(guardarMisPlayas(almacen(), ['mancora']), true);

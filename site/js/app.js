@@ -11,7 +11,7 @@ import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, pr
 import { textoResumen, enlaceWhatsapp, dibujarTarjeta } from './compartir.js';
 import { conCache, leerCache, guardarCache, podarCache } from './cache.js';
 import { cercanas, zonasDe, conGrifos } from './catalogo.js';
-import { iniciarMisPlayas, guardarMisPlayas } from './mis-playas.js';
+import { leerMisPlayas, playasAVer, guardarMisPlayas } from './mis-playas.js';
 import { panelSelector } from './selector.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
@@ -69,9 +69,9 @@ async function iniciar({ forzar = false } = {}) {
   if (!estado.selector) raiz.replaceChildren(el('p', { class: 'cargando', text: 'Consultando el mar y el aviso del DHN…' }));
   const a = almacen();
   const [config, catalogo] = await Promise.all([cargarJson('./config.json'), cargarJson('./playas.json')]);
-  // Antes de guardar nada en caché: iniciarMisPlayas distingue así al usuario nuevo del que ya usaba la app.
-  estado.ids ??= iniciarMisPlayas(a, catalogo.playas.map((p) => p.id));
-  const playas = estado.ids.map((id) => catalogo.playas.find((p) => p.id === id)).filter(Boolean);
+  // estado.ids es lo que el remero eligió; si todavía no eligió, se muestran las playas de ejemplo.
+  estado.ids ??= leerMisPlayas(a, catalogo.playas.map((p) => p.id));
+  const playas = playasAVer(estado.ids).map((id) => catalogo.playas.find((p) => p.id === id)).filter(Boolean);
   const json = (clave, url) => conCache(a, clave, () => cargarJson(url), { forzar }).then((r) => r.datos).catch(() => null);
   const claveMar = `mar:${playas.map((p) => `${p.lat},${p.lon}`).join(';')}`;
   const [dhn, tempMar, climaMar, grifos, mar] = await Promise.all([
@@ -308,7 +308,7 @@ function pintar() {
   const cursor = foco === 'buscar-playa' ? activo.selectionStart : null;
   const fecha = document.getElementById('fecha-hoy');
   if (fecha) fecha.textContent = fmt(estado.ahoraMs, { weekday: 'long', day: 'numeric', month: 'long' });
-  raiz.replaceChildren(...(estado.config.playas.length ? piezasConPlayas() : piezasSinPlayas()).filter(Boolean));
+  raiz.replaceChildren(...piezas().filter(Boolean));
   if (!foco) return;
   const nodo = raiz.querySelector(`[data-foco="${foco}"]`);
   if (!nodo || nodo.disabled) return;
@@ -316,19 +316,23 @@ function pintar() {
   if (cursor !== null) nodo.setSelectionRange?.(cursor, cursor);
 }
 
-function piezasConPlayas() {
+function piezas() {
   const { tsun, resultados, oleaje } = evaluarTodo();
   const oceano = esOceano();
   // Mismo orden en los dos temas; el océano solo agrega sus piezas propias después de las playas.
   const mejorId = oceano ? estadoDia(resultados).mejor?.playa.id : null;
+  // Sin playas propias, el aviso (y el panel que abre) va arriba, a la vista.
+  const sinElegir = !estado.ids.length;
+  const misPlayas = estado.selector ? selectorPlayas() : sinElegir ? avisoPlayasDeEjemplo() : botonMisPlayas();
   return [
     bannerTsunami(tsun),
+    sinElegir ? misPlayas : null,
     barraLuna(),
     bannerSinConexion(),
     bannerActualizando(),
     bannerDhn(),
     bannerOleaje(resultados),
-    estado.selector ? selectorPlayas() : botonMisPlayas(),
+    sinElegir ? null : misPlayas,
     pestanas(),
     bloqueOleaje(oleaje),
     bloqueTemperatura(),
@@ -347,16 +351,24 @@ function piezasConPlayas() {
   ];
 }
 
-// Sin playas no hay semáforo, pero las alertas de tsunami y el estado del DHN se muestran igual.
-function piezasSinPlayas() {
-  const tsun = evaluarTsunami(estado.dhn?.tsunami, estado.ahoraMs);
-  return [bannerTsunami(tsun), bannerActualizando(), bannerDhn(), selectorPlayas(), pie(tsun)];
+// ---------- Mis playas ----------
+function abrirSelector() {
+  estado.selector = true;
+  pintar();
 }
 
-// ---------- Mis playas ----------
+function avisoPlayasDeEjemplo() {
+  const b = el('button', { type: 'button', class: 'boton-mis-playas', 'data-foco': 'mis-playas', text: '📍 Elegir mis playas' });
+  b.addEventListener('click', abrirSelector);
+  return el('section', { class: 'playas-ejemplo' },
+    el('p', {}, el('strong', { text: 'Estás viendo playas de Lima y Callao' }),
+      el('span', { class: 'gris', text: 'Elige las tuyas por nombre o cerca de ti.' })),
+    b);
+}
+
 function botonMisPlayas() {
   const b = el('button', { type: 'button', class: 'boton-mis-playas', 'data-foco': 'mis-playas', text: '📍 Mis playas · agregar o cambiar' });
-  b.addEventListener('click', () => { estado.selector = true; pintar(); });
+  b.addEventListener('click', abrirSelector);
   return b;
 }
 
@@ -389,7 +401,7 @@ function cambiarMisPlayas(ids) {
 function cerrarSelector() {
   Object.assign(estado, { selector: false, consulta: '', cerca: null, mensajeSelector: '' });
   const cargadas = estado.config.playas.map((p) => p.id).join();
-  if (cargadas === estado.ids.join()) pintar();
+  if (cargadas === playasAVer(estado.ids).join()) pintar();
   else iniciar().catch(mostrarError);
 }
 

@@ -1,19 +1,8 @@
 // "Mis playas": los ids que el remero eligió, guardados en el navegador.
 export const MAX_PLAYAS = 6;
 export const CLAVE_MIS_PLAYAS = 'boletin-olas:mis-playas:v1';
+// Las 4 de Lima y Callao: lo que ve quien todavía no eligió las suyas.
 export const ORIGINALES = ['yuyos', 'la-punta', 'punta-hermosa', 'san-bartolo'];
-
-const CLAVE_SALIDAS = 'boletin-olas:salidas:v1';
-const PREFIJO_CACHE = 'cache:v1:';
-
-// Quien ya usaba la app (tiene salidas o datos guardados) no debe perder sus playas.
-function yaUsabaLaApp(storage) {
-  if (storage.getItem(CLAVE_SALIDAS) !== null) return true;
-  for (let i = 0; i < storage.length; i += 1) {
-    if (storage.key(i)?.startsWith(PREFIJO_CACHE)) return true;
-  }
-  return false;
-}
 
 export function guardarMisPlayas(storage, lista) {
   try {
@@ -25,24 +14,17 @@ export function guardarMisPlayas(storage, lista) {
   }
 }
 
-// Llamar ANTES de que la app guarde nada en caché. El resultado se guarda de inmediato (también la lista
-// vacía): así un usuario nuevo no pasa por "usuario actual" en su segunda visita.
-export function iniciarMisPlayas(storage, idsCatalogo) {
-  let lista = [];
+// Lo que el remero eligió ([] si todavía nada). Solo lee: mientras no elija, no se guarda nada.
+export function leerMisPlayas(storage, idsCatalogo) {
   try {
-    const crudo = storage?.getItem(CLAVE_MIS_PLAYAS) ?? null;
-    if (crudo !== null) {
-      const datos = JSON.parse(crudo);
-      if (Array.isArray(datos)) lista = [...new Set(datos)].filter((id) => idsCatalogo.includes(id)).slice(0, MAX_PLAYAS);
-    } else if (storage && yaUsabaLaApp(storage)) {
-      lista = ORIGINALES.filter((id) => idsCatalogo.includes(id));
-    }
+    const datos = JSON.parse(storage?.getItem(CLAVE_MIS_PLAYAS) ?? '[]');
+    return Array.isArray(datos) ? [...new Set(datos)].filter((id) => idsCatalogo.includes(id)).slice(0, MAX_PLAYAS) : [];
   } catch {
-    lista = [];
+    return [];
   }
-  guardarMisPlayas(storage, lista);
-  return lista;
 }
+
+export const playasAVer = (elegidas) => (elegidas.length ? elegidas : ORIGINALES);
 
 export const agregar = (lista, id) => (lista.includes(id) || lista.length >= MAX_PLAYAS ? lista : [...lista, id]);
 export const quitar = (lista, id) => lista.filter((x) => x !== id);
