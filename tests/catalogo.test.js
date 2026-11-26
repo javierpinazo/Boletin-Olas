@@ -97,3 +97,12 @@ test('conGrifos: solo si alguna playa elegida es de Lima o Callao', () => {
   assert.equal(conGrifos([{ region: 'Piura' }]), false);
   assert.equal(conGrifos([]), false);
 });
+
+test('clima: cada zona tiene su habitual completo', () => {
+  const clima = JSON.parse(fs.readFileSync(new URL('../site/clima-mar.json', import.meta.url), 'utf8'));
+  for (const z of zonas) {
+    const serie = clima.zonas?.[z.id];
+    assert.equal(serie?.length, 366, z.id);
+    assert.ok(serie.every(Number.isFinite), z.id);
+  }
+});
