@@ -14,6 +14,13 @@
     "horasMaxDhn": 3
   },
   "ventana": { "horaInicio": 6, "horaFin": 17 },
+  "promocion": {
+    "activa": true,
+    "rotulo": "Publicidad · de Automatizate 360",
+    "titulo": "¿Tienes un local? Ordena tu ITSE",
+    "boton": "ITSE Fácil →",
+    "url": "https://itsefacil.com/"
+  },
   "firma": { "texto": "Soluciones: Automatizate 360", "url": "" },
   "grifos": {
     "producto": "GASOHOL PREMIUM",

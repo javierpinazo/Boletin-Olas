@@ -13,6 +13,8 @@ import { conCache, leerCache, guardarCache, podarCache } from './cache.js';
 import { cercanas, zonasDe, conGrifos } from './catalogo.js';
 import { leerMisPlayas, playasAVer, guardarMisPlayas } from './mis-playas.js';
 import { panelSelector } from './selector.js';
+import { leerPromocion, enlaceDe, promocionSinAlertas } from './promocion.js';
+import { barraVisible } from './barra-marca.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
 const ETIQUETA = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo' };
@@ -324,14 +326,20 @@ function piezas() {
   // Sin playas propias, el aviso (y el panel que abre) va arriba, a la vista.
   const sinElegir = !estado.ids.length;
   const misPlayas = estado.selector ? selectorPlayas() : sinElegir ? avisoPlayasDeEjemplo() : botonMisPlayas();
+  const tsunami = bannerTsunami(tsun);
+  const sinConexion = bannerSinConexion();
+  const dhnViejo = bannerDhn();
+  const oleajeFuerte = bannerOleaje(resultados);
+  const alertas = [tsunami, sinConexion, dhnViejo, oleajeFuerte];
   return [
-    bannerTsunami(tsun),
+    tarjetaPromocion(promocionSinAlertas(leerPromocion(estado.config), alertas)),
+    tsunami,
     sinElegir ? misPlayas : null,
     barraLuna(),
-    bannerSinConexion(),
+    sinConexion,
     bannerActualizando(),
-    bannerDhn(),
-    bannerOleaje(resultados),
+    dhnViejo,
+    oleajeFuerte,
     sinElegir ? null : misPlayas,
     pestanas(),
     bloqueOleaje(oleaje),
@@ -613,6 +621,27 @@ function instalarApp() {
       boton),
     ayuda);
 }
+
+// ---------- Publicidad propia: identificada como tal y oculta cuando hay alertas ----------
+function tarjetaPromocion(p) {
+  if (!p) return null;
+  return el('aside', { class: 'promocion', 'aria-label': 'Publicidad' },
+    el('div', { class: 'promocion-textos' },
+      el('span', { class: 'promocion-rotulo', text: p.rotulo }),
+      el('span', { class: 'promocion-titulo', text: p.titulo })),
+    el('a', { class: 'promocion-boton', href: enlaceDe(p, 'franja'), target: '_blank', rel: 'noopener noreferrer', text: p.boton }));
+}
+
+// ---------- Barra de marca: queda pegada arriba cuando la cabecera sale de la pantalla ----------
+const cabecera = document.querySelector('.cabecera-sitio');
+const barraMarca = document.getElementById('barra-marca');
+function actualizarBarra() {
+  if (!barraMarca) return; // página anterior aún en la caché del celular
+  barraMarca.classList.toggle('visible', barraVisible(cabecera.getBoundingClientRect().bottom));
+}
+window.addEventListener('scroll', actualizarBarra, { passive: true });
+window.addEventListener('resize', actualizarBarra);
+actualizarBarra();
 
 // ---------- Fases de la Luna (calculadas en el navegador; son informativas, no entran al semáforo) ----------
 function discoLuna(p, r = 14) {
