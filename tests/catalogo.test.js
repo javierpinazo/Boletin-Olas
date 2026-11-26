@@ -106,3 +106,14 @@ test('clima: cada zona tiene su habitual completo', () => {
     assert.ok(serie.every(Number.isFinite), z.id);
   }
 });
+
+// En la primera apertura tras publicar, el service worker anterior sirve el app.js viejo (de su caché) junto con el
+// config.json nuevo (va primero a la red). Ese app.js recorre config.playas: sin la lista, la página no arranca.
+test('config.json conserva las 4 playas para la app anterior que quede en caché', () => {
+  const config = JSON.parse(fs.readFileSync(new URL('../site/config.json', import.meta.url), 'utf8'));
+  assert.deepEqual(config.playas?.map((p) => p.id).sort(), Object.keys(ORIGINALES).sort());
+  for (const p of config.playas) {
+    const { nombre, lat, lon, orientacion, factorOla, latTramo } = playas.find((x) => x.id === p.id);
+    assert.deepEqual(p, { id: p.id, nombre, lat, lon, orientacion, factorOla, ...(latTramo === undefined ? {} : { latTramo }) });
+  }
+});

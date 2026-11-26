@@ -33,5 +33,12 @@
       { "nombre": "San Borja y Clínica Internacional", "distritos": ["San Borja", "Surquillo"], "avenidas": ["Guardia Civil", "Aviación"] },
       { "nombre": "Panamericana Sur", "distritos": ["Santiago de Surco", "Chorrillos", "Villa El Salvador", "Lurín"], "avenidas": ["Panamericana Sur"] }
     ]
-  }
+  },
+  "_playas": "Solo para la versión anterior de la app que quede en la caché de un celular. El catálogo es playas.json. Se puede quitar unas semanas después de publicar.",
+  "playas": [
+    { "id": "yuyos", "nombre": "Yuyos", "lat": -12.149, "lon": -77.026, "orientacion": 225, "factorOla": 0.31 },
+    { "id": "la-punta", "nombre": "La Punta", "lat": -12.071, "lon": -77.164, "orientacion": 15, "factorOla": 0.31, "latTramo": -12.05 },
+    { "id": "punta-hermosa", "nombre": "Punta Hermosa", "lat": -12.337, "lon": -76.826, "orientacion": 240, "factorOla": 0.31 },
+    { "id": "san-bartolo", "nombre": "San Bartolo", "lat": -12.389, "lon": -76.779, "orientacion": 260, "factorOla": 0.31 }
+  ]
 }
