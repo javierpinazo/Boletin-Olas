@@ -7,7 +7,7 @@ import { MAX_PLAYAS, agregar, quitar, mover } from './mis-playas.js';
 const KM_LEJOS = 50;
 
 export function panelSelector({
-  el, catalogo, ids, consulta, cerca, ubicando, mensaje, alCambiar, alBuscar, alUbicar, alCerrar,
+  el, catalogo, ids, consulta, cerca, ubicando, mensaje, hayCargadas, alCambiar, alBuscar, alUbicar, alCerrar,
 }) {
   const porId = new Map(catalogo.playas.map((p) => [p.id, p]));
   const lleno = ids.length >= MAX_PLAYAS;
@@ -80,7 +80,7 @@ export function panelSelector({
   return el('section', { class: 'selector', 'aria-label': 'Mis playas' },
     el('h2', { text: ids.length ? 'Mis playas' : 'Agrega tu playa' }),
     ids.length ? el('ul', { class: 'sel-elegidas' }, elegidas) : el('p', { class: 'gris', text: `Elige hasta ${MAX_PLAYAS} playas donde remas. Quedan guardadas en este celular.` }),
-    ids.length ? boton('Listo', 'Listo: ver mis playas', 'listo', alCerrar) : null,
+    ids.length || hayCargadas ? boton('Listo', 'Listo: ver mis playas', 'listo', alCerrar) : null,
     el('h3', { class: 'sel-titulo', text: 'Agregar playa' }),
     lleno ? el('p', { class: 'nota', role: 'status', text: `Máximo ${MAX_PLAYAS} playas: quita una para agregar otra.` }) : null,
     el('div', { class: 'sel-barra' }, campo,

@@ -9,7 +9,7 @@ import {
 } from './salidas.js';
 import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, proximas, trazoLuz } from './luna.js';
 import { textoResumen, enlaceWhatsapp, dibujarTarjeta } from './compartir.js';
-import { conCache, leerCache, guardarCache } from './cache.js';
+import { conCache, leerCache, guardarCache, podarCache } from './cache.js';
 import { cercanas, zonasDe, conGrifos } from './catalogo.js';
 import { iniciarMisPlayas, guardarMisPlayas } from './mis-playas.js';
 import { panelSelector } from './selector.js';
@@ -73,19 +73,22 @@ async function iniciar({ forzar = false } = {}) {
   estado.ids ??= iniciarMisPlayas(a, catalogo.playas.map((p) => p.id));
   const playas = estado.ids.map((id) => catalogo.playas.find((p) => p.id === id)).filter(Boolean);
   const json = (clave, url) => conCache(a, clave, () => cargarJson(url), { forzar }).then((r) => r.datos).catch(() => null);
+  const claveMar = `mar:${playas.map((p) => `${p.lat},${p.lon}`).join(';')}`;
   const [dhn, tempMar, climaMar, grifos, mar] = await Promise.all([
     cargarJson('./data/dhn.json').catch(() => null),
     json('temp-mar-zonas', './data/temp-mar.json'),
     json('clima-mar-zonas', './clima-mar.json'),
     json('grifos', './data/grifos.json'),
     // Todas las playas en una sola consulta por API; si esa falla, playa por playa (una mala no tumba a las demás).
-    !playas.length ? null : conCache(a, `mar:${playas.map((p) => `${p.lat},${p.lon}`).join(';')}`, () => cargarMarVarias(playas).catch(async () => {
+    !playas.length ? null : conCache(a, claveMar, () => cargarMarVarias(playas).catch(async () => {
       const sueltas = await Promise.allSettled(playas.map((p) => cargarMar(p)));
       if (sueltas.every((s) => s.status === 'rejected')) throw sueltas[0].reason;
       return sueltas.map((s) => (s.status === 'fulfilled' ? s.value : null));
     }), { forzar }).catch(() => null),
   ]);
   if (turno !== estado.turno) return;
+  // Con el mar de la selección actual ya guardado, sobra el de selecciones anteriores (cada uno ocupa bastante).
+  if (mar && !mar.vencido) podarCache(a, claveMar);
   // Playas y datos del mar se asignan juntos: van emparejados por posición.
   Object.assign(estado, { catalogo, config: { ...config, playas }, dhn, tempMar, climaMar, grifos });
   estado.mar = mar?.datos ?? playas.map(() => null);
@@ -113,7 +116,7 @@ async function refrescar({ forzar = false } = {}) {
     if (r.ok && (await r.json()).actualizado) {
       const fresco = (clave, url, actual) => conCache(a, clave, () => cargarJson(url), { forzar: true }).then((x) => x.datos).catch(() => actual);
       estado.dhn = await cargarJson('./data/dhn.json').catch(() => estado.dhn);
-      estado.tempMar = await fresco('temp-mar', './data/temp-mar.json', estado.tempMar);
+      estado.tempMar = await fresco('temp-mar-zonas', './data/temp-mar.json', estado.tempMar);
       estado.grifos = await fresco('grifos', './data/grifos.json', estado.grifos);
       estado.ahoraMs = Date.now();
     }
@@ -366,6 +369,7 @@ function selectorPlayas() {
     consulta: estado.consulta,
     cerca: estado.cerca,
     ubicando: estado.ubicando,
+    hayCargadas: estado.config.playas.length > 0,
     mensaje: estado.mensajeSelector,
     alCambiar: cambiarMisPlayas,
     alBuscar: (texto) => { estado.consulta = texto; estado.cerca = null; },

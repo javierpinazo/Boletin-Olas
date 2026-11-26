@@ -26,6 +26,21 @@ export function guardarCache(almacen, clave, datos, ahora = Date.now()) {
   }
 }
 
+// Borra el mar guardado de otras selecciones de playas y las claves de la versión anterior, para no llenar el
+// almacenamiento (si se llena, dejan de guardarse Mis playas y las salidas).
+export function podarCache(almacen, claveMarVigente) {
+  try {
+    const claves = Array.from({ length: almacen?.length ?? 0 }, (_, i) => almacen.key(i));
+    for (const k of claves) {
+      const sobra = (k.startsWith(`${PREFIJO}mar:`) && k !== PREFIJO + claveMarVigente)
+        || k === `${PREFIJO}temp-mar` || k === `${PREFIJO}clima-mar`;
+      if (sobra) almacen.removeItem(k);
+    }
+  } catch {
+    // almacenamiento bloqueado: no hay nada que podar
+  }
+}
+
 // Devuelve { datos, t, desdeCache, vencido }: el guardado si está vigente; si no (o con forzar), lo pide y lo
 // guarda. Sin conexión (la petición falla) se usa el último guardado aunque esté vencido, marcado `vencido`.
 export async function conCache(almacen, clave, pedir, { forzar = false, maxMs = MAX_CACHE_MS, ahora = Date.now() } = {}) {

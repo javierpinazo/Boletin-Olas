@@ -52,7 +52,9 @@ navegador ──▶ Open-Meteo (oleaje, viento, mareas) en vivo
 
 ## Operación
 
-- **Actualizar el código:** `ssh PayHub@servidor /opt/boletin-olas/deploy/vps/actualizar-codigo.sh`.
+- **Actualizar el código:** `ssh PayHub@servidor /opt/boletin-olas/deploy/vps/actualizar-codigo.sh`. Si el cambio afecta a
+  los datos de `data/` (p. ej. su formato), ejecuta después `/opt/boletin-olas/deploy/vps/actualizar.sh`: si no, no se
+  regeneran hasta el cron del día siguiente o hasta que el dato del DHN tenga 3 h.
 - **Ver que funciona:** `curl -s https://olas.veripago.pe/data/dhn.json | head -3` y mira `generadoEn` (debe ser de hace
   menos de una hora). La propia página avisa con un banner amarillo si los datos pasan de 3 h.
 - **Si el DHN no responde:** el script falla, n8n marca la ejecución como fallida y el sitio sigue sirviendo el último
