@@ -26,6 +26,11 @@
 El modelo da la ola de mar abierto; en la zona tranquila donde remas suele ser mucho menor. Yuyos, La Punta,
 Punta Hermosa y San Bartolo traen un `factorOla` de 0,31 en el catálogo; las demás no tienen factor.
 
+**Excepción, Yuyos:** la zona de paddle está junto a un espigón y usa `factorOlaDhn`, un factor según el oleaje
+del DHN: normal 0,34, leve 0,58, medio y alto 0,73. Con el DHN al día y sin aviso vigente se toma como normal;
+si faltan datos, están desactualizados o no se pudo leer el aviso, 0,73. Ahí los registros de olas no cambian el
+factor (los de viento sí). Sale de alturas observadas a ojo, no de mediciones.
+
 1. Al volver de remar, abre la tarjeta de la playa (pestaña **Hoy**) y marca cómo estaba el mar (Plano, Olitas, Con olas, No se podía remar) **y el viento** (Calmo, Moderado, Fuerte, Muy fuerte).
 2. Con 3 o más salidas en una playa, la app calcula sus factores de ola y de viento (mediana de lo que viste / lo que decía el modelo) y los usa en lugar de los del catálogo. El factor de viento corrige también las ráfagas. La tarjeta dice cuáles está usando y la tabla muestra, en gris, el valor original del modelo.
 3. Las salidas se guardan en el navegador. **Exporta** de vez en cuando (panel "Tus salidas") e **importa** el archivo en otro navegador o celular.

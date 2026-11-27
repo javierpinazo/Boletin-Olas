@@ -207,6 +207,14 @@ function mejorRacha(horas, aceptable, minHoras) {
 // Open-Meteo da la ola de su celda de mar abierto; en la zona tranquila donde se rema suele ser bastante
 // menor. `playa.factorOla` (config.json, 1 si falta) la corrige; la ola original queda en `hsModelo`.
 // Además, si la ola llega de costado o de espaldas a la playa (orientación), solo llega una parte.
+// Donde un solo factor no alcanza (Yuyos, junto a un espigón), `playa.factorOlaDhn` da uno por nivel del DHN;
+// `sinDato` es el precavido, para cuando no se puede saber el nivel.
+export function factorOlaEn(playa, nivel) {
+  const porNivel = playa.factorOlaDhn;
+  if (!porNivel) return playa.factorOla ?? 1;
+  return porNivel[nivel] ?? porNivel.sinDato;
+}
+
 function corregirOla(dato, factorOla, orientacion, u) {
   if (sinDato(dato.hs)) return dato;
   const exposicion = factorExposicion(dato.dirOla, orientacion, u);
@@ -248,9 +256,13 @@ export function evaluarPlayaDia({ playa, horasCrudas: horasDelModelo, aviso, dhn
   const u = config.umbrales;
   const factorOla = playa.factorOla ?? 1;
   const factorViento = playa.factorViento ?? 1;
-  const horasCrudas = horasDelModelo.map((dato) => corregirViento(corregirOla(dato, factorOla, playa.orientacion, u), factorViento));
   const estDhn = estadoDhn(dhn, ahoraMs, u);
   const tramo = aviso ? tramoParaPlaya(playa, aviso) : null;
+  // Para elegir el factor de ola: con el DHN al día y sin aviso vigente en esa fecha, el oleaje se toma como
+  // normal (el semáforo sigue sin pasar de amarillo). Con datos del DHN con problemas no hay nivel.
+  const nivelParaFactor = (dato) => (estDhn === 'ok' && tramo ? nivelEn(tramo, aviso, `${dato.hora}:00-05:00`) ?? 'normal' : null);
+  const horasCrudas = horasDelModelo.map((dato) => corregirViento(
+    corregirOla(dato, factorOlaEn(playa, nivelParaFactor(dato)), playa.orientacion, u), factorViento));
   const notas = [];
   if (estDhn === 'ausente') notas.push('No hay datos del DHN: el semáforo no puede pasar de amarillo.');
   if (estDhn === 'obsoleto') notas.push('Los datos del DHN están desactualizados: tope amarillo.');

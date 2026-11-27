@@ -68,6 +68,9 @@ export function factorAprendido(lista, playaId) {
   );
 }
 
+// En una playa con factor por nivel del DHN, un factor único aprendido lo anularía: los registros de olas no se usan.
+export const factorAprendidoDePlaya = (lista, playa) => (playa.factorOlaDhn ? null : factorAprendido(lista, playa.id));
+
 // Igual para el viento: (km/h percibidos / km/h del modelo).
 export function factorVientoAprendido(lista, playaId) {
   return factorDeMediana(

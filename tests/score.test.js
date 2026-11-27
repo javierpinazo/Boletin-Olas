@@ -16,8 +16,12 @@ const catalogo = JSON.parse(fs.readFileSync(new URL('../site/playas.json', impor
 // Las 4 originales (las que traen factor calibrado).
 config.playas = catalogo.playas.filter((p) => ['yuyos', 'la-punta', 'punta-hermosa', 'san-bartolo'].includes(p.id));
 const u = config.umbrales;
-// Los tests de umbrales usan la ola del modelo tal cual (factor 1); el factor real se prueba aparte.
-const playa = (id) => ({ ...config.playas.find((p) => p.id === id), factorOla: 1 });
+// Los tests de umbrales usan la ola del modelo tal cual (factor 1, sin factor por nivel del DHN, que se prueba
+// en factor-dhn.test.js); el factor único real se prueba aparte.
+const playa = (id) => {
+  const { factorOlaDhn, ...p } = config.playas.find((x) => x.id === id);
+  return { ...p, factorOla: 1 };
+};
 const aviso39 = parseAviso(separarItems(fs.readFileSync(new URL('avisos-oleaje.html', FX), 'utf8'))[0]);
 
 test('altura: límites exactos', () => {

@@ -4,7 +4,7 @@
 // - Datos del servidor (/data/*.json, config.json, playas.json): primero la red; sin conexión, la última copia guardada.
 //   El aviso del DHN (alertas de tsunami) nunca se sirve viejo si hay red.
 // - /api/actualizar y Open-Meteo no pasan por aquí (Open-Meteo lo guarda la app 30 min en su caché).
-const VERSION = 'olas-v10';
+const VERSION = 'olas-v11';
 const APP = [
   './', './index.html', './style.css', './manifest.json', './icon.svg', './config.json', './playas.json', './clima-mar.json',
   './fonts/inter-latin.woff2', './fonts/space-grotesk-latin.woff2',

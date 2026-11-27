@@ -43,7 +43,7 @@
     {"id":"chancay","nombre":"Chancay","region":"Lima","lat":-11.5628,"lon":-77.27,"orientacion":251,"zonaTemp":"callao","verificada":false},
     {"id":"ancon","nombre":"Ancón","region":"Lima","lat":-11.7739,"lon":-77.1753,"orientacion":313,"zonaTemp":"callao","verificada":false},
     {"id":"la-punta","nombre":"La Punta","region":"Callao","lat":-12.071,"lon":-77.164,"orientacion":15,"zonaTemp":"callao","verificada":true,"factorOla":0.31,"latTramo":-12.05},
-    {"id":"yuyos","nombre":"Yuyos","region":"Lima","lat":-12.149,"lon":-77.026,"orientacion":225,"zonaTemp":"callao","verificada":true,"factorOla":0.31},
+    {"id":"yuyos","nombre":"Yuyos","region":"Lima","lat":-12.149,"lon":-77.026,"orientacion":225,"zonaTemp":"callao","verificada":true,"factorOla":0.31,"factorOlaDhn":{"normal":0.34,"ligero":0.58,"moderado":0.73,"fuerte":0.73,"muy fuerte":0.73,"sinDato":0.73}},
     {"id":"pescadores-chorrillos","nombre":"Pescadores (Chorrillos)","region":"Lima","lat":-12.1656,"lon":-77.0305,"orientacion":326,"zonaTemp":"callao","verificada":false},
     {"id":"punta-hermosa","nombre":"Punta Hermosa","region":"Lima","lat":-12.337,"lon":-76.826,"orientacion":240,"zonaTemp":"lima-sur","verificada":true,"factorOla":0.31},
     {"id":"san-bartolo","nombre":"San Bartolo","region":"Lima","lat":-12.389,"lon":-76.779,"orientacion":260,"zonaTemp":"lima-sur","verificada":true,"factorOla":0.31},

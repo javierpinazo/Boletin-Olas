@@ -4,7 +4,7 @@ import {
   describirSinBloque, motivoHora, gradoMar, colorRafaga, COLOR_GRADO, ETIQUETA_GRADO,
 } from './score.js';
 import {
-  IMPRESIONES, IMPRESIONES_VIENTO, nuevaSalida, agregarSalida, factorAprendido, factorVientoAprendido, fusionar,
+  IMPRESIONES, IMPRESIONES_VIENTO, nuevaSalida, agregarSalida, factorAprendidoDePlaya, factorVientoAprendido, fusionar,
   hsBaseDelDia, vientoBaseDelDia, leerSalidas, guardarSalidas,
 } from './salidas.js';
 import { NOMBRES as FASES, posicionCiclo, indiceFase, iluminacion, tipoMarea, proximas, trazoLuz } from './luna.js';
@@ -142,7 +142,7 @@ function evaluarTodo() {
   const fecha = fechaDelDia(estado.dia);
   const resultados = config.playas.map((playa, i) => {
     // Con 3 o más salidas registradas en esta playa, sus factores de ola y de viento aprendidos reemplazan a los del config.
-    const aprendido = factorAprendido(estado.salidas, playa.id);
+    const aprendido = factorAprendidoDePlaya(estado.salidas, playa);
     const aprendidoViento = factorVientoAprendido(estado.salidas, playa.id);
     const horas = estado.mar[i];
     const playaFactores = {
@@ -764,6 +764,10 @@ function notaFactor(r) {
   const salidasPlaya = estado.salidas.filter((s) => s.playaId === r.playa.id && s.impresion).length;
   if (r.aprendido) {
     return `Ola en tu zona = ola del modelo × ${coma(r.aprendido.factor)}, aprendido de tus ${r.aprendido.n} salidas (sin tus salidas sería ${coma(r.playa.factorOla ?? 1)}).`;
+  }
+  if (r.playa.factorOlaDhn) {
+    const f = r.playa.factorOlaDhn;
+    return `Ola en tu zona = ola del modelo × un factor según el oleaje del DHN: normal o sin aviso vigente ${coma(f.normal)} · leve ${coma(f.ligero)} · medio ${coma(f.moderado)} · alto ${coma(f.fuerte)}. Si los datos del DHN no están al día, ${coma(f.sinDato)}. En esta playa tus registros de olas no cambian el factor.`;
   }
   if (r.playa.factorOla === undefined) {
     return `Sin calibrar: usa la ola completa del modelo, que suele ser mayor que en una zona protegida. Registra cómo estaba el mar en 3 salidas para ajustarlo: llevas ${salidasPlaya}.`;
