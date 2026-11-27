@@ -19,13 +19,22 @@ test('cabecera: distintivo "Powered by Automatizate 360"', () => {
   assert.match(entre('<header', '</header>'), distintivo('cabecera'));
 });
 
-test('barra: símbolo que vuelve arriba y distintivo; no es publicidad', () => {
+test('barra: símbolo que vuelve arriba y botón "Te ayudamos a sacar tu ITSE · Powered by Automatizate 360"', () => {
   const barra = entre('<div id="barra-marca"', '<main');
   assert.match(barra, /^<div id="barra-marca" class="barra-marca">/);
   assert.match(barra, /<a class="barra-inicio" href="#top" aria-label="Boletín Olas: volver arriba">\s*<svg/);
   assert.match(barra, /<span>Boletín Olas<\/span>/);
-  assert.match(barra, distintivo('barra'));
-  assert.doesNotMatch(barra, /publicidad|itse/i);
+  assert.match(barra, /<a class="boton-itse" href="https:\/\/itsefacil\.com\/\?utm_source=boletin-olas&amp;utm_medium=barra" target="_blank" rel="noopener noreferrer">\s*<strong>Te ayudamos a sacar tu ITSE<\/strong>\s*<span>Powered by Automatizate 360<\/span>\s*<\/a>/);
+  assert.doesNotMatch(barra, /distintivo|publicidad/i);
+});
+
+test('ya no hay tarjeta de publicidad', () => {
+  const config = JSON.parse(leer('../site/config.json'));
+  assert.equal(config.promocion, undefined);
+  assert.doesNotMatch(leer('../site/js/app.js'), /promocion|publicidad/i);
+  assert.doesNotMatch(leer('../site/sw.js'), /promocion/);
+  assert.doesNotMatch(leer('../site/style.css'), /\.promocion/);
+  assert.equal(fs.existsSync(new URL('../site/js/promocion.js', import.meta.url)), false);
 });
 
 test('app.js muestra la barra al bajar, sin depender de datos ni alertas; la app sin conexión la incluye', () => {

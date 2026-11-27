@@ -13,7 +13,6 @@ import { conCache, leerCache, guardarCache, podarCache } from './cache.js';
 import { cercanas, zonasDe, conGrifos } from './catalogo.js';
 import { leerMisPlayas, playasAVer, guardarMisPlayas } from './mis-playas.js';
 import { panelSelector } from './selector.js';
-import { leerPromocion, enlaceDe, promocionSinAlertas } from './promocion.js';
 import { barraVisible } from './barra-marca.js';
 
 const SIMBOLO = { verde: '✔', amarillo: '⚠', naranja: '▲', rojo: '✖' };
@@ -332,7 +331,6 @@ function piezas() {
   const oleajeFuerte = bannerOleaje(resultados);
   const alertas = [tsunami, sinConexion, dhnViejo, oleajeFuerte];
   return [
-    tarjetaPromocion(promocionSinAlertas(leerPromocion(estado.config), alertas)),
     tsunami,
     sinElegir ? misPlayas : null,
     barraLuna(),
@@ -620,16 +618,6 @@ function instalarApp() {
       el('div', { class: 'instalar-texto' }, el('strong', { text: 'Tenla en tu pantalla de inicio' }), el('span', { text: 'Se abre como una app, sin tienda' })),
       boton),
     ayuda);
-}
-
-// ---------- Publicidad propia: identificada como tal y oculta cuando hay alertas ----------
-function tarjetaPromocion(p) {
-  if (!p) return null;
-  return el('aside', { class: 'promocion', 'aria-label': 'Publicidad' },
-    el('div', { class: 'promocion-textos' },
-      el('span', { class: 'promocion-rotulo', text: p.rotulo }),
-      el('span', { class: 'promocion-titulo', text: p.titulo })),
-    el('a', { class: 'promocion-boton', href: enlaceDe(p, 'franja'), target: '_blank', rel: 'noopener noreferrer', text: p.boton }));
 }
 
 // ---------- Barra de marca: queda pegada arriba cuando la cabecera sale de la pantalla ----------

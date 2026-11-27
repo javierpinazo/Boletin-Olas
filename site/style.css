@@ -461,20 +461,6 @@ footer p { margin: 6px 0; }
 .playas-ejemplo { background: var(--tarjeta); border: 1px solid var(--acento); border-radius: 16px; padding: 12px 16px; }
 .playas-ejemplo p { display: flex; flex-direction: column; margin: 0 0 10px; }
 
-/* ---------- Publicidad propia: clara y compacta para que no se confunda con el reporte ---------- */
-.promocion {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  background: #f4f8fb; color: #10263a; border: 1px solid #c9d8e4; border-radius: 14px; padding: 6px 8px 6px 12px;
-}
-.promocion-textos { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; text-align: left; }
-.promocion-rotulo { font-size: .62rem; text-transform: uppercase; letter-spacing: .04em; color: #4a5b6a; }
-.promocion-titulo { font-size: .85rem; font-weight: 700; }
-a.promocion-boton {
-  display: flex; flex: 0 0 auto; align-items: center; justify-content: center; min-height: 44px; padding: 0 12px;
-  border-radius: 10px; background: #0b5ea8; color: #ffffff; font-size: .82rem; font-weight: 700; text-decoration: none; white-space: nowrap;
-}
-a.promocion-boton:focus-visible { outline: 3px solid #0b5ea8; outline-offset: 2px; }
-
 /* ---------- Marca: distintivo en la cabecera y barra pegada arriba al bajar ---------- */
 a.distintivo {
   display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 999px; background: #f4f8fb; color: #4a5b6a;
@@ -499,7 +485,7 @@ a.distintivo:focus-visible { outline: 3px solid var(--acento); outline-offset: 2
   transition: transform .4s cubic-bezier(.22, .8, .3, 1), opacity .3s ease, visibility 0s linear .4s;
 }
 .barra-marca.visible { visibility: visible; opacity: 1; transform: none; transition-delay: 0s; }
-/* El símbolo y el distintivo se acomodan un instante después que la barra. */
+/* El símbolo y el botón se acomodan un instante después que la barra. */
 .barra-marca > a { opacity: 0; transform: translateY(-10px); transition: transform .45s cubic-bezier(.22, .8, .3, 1), opacity .35s ease; }
 .barra-marca.visible > a { opacity: 1; transform: none; transition-delay: .12s; }
 /* Con "reducir movimiento" activado en el equipo, solo se funde. */
@@ -510,12 +496,14 @@ a.distintivo:focus-visible { outline: 3px solid var(--acento); outline-offset: 2
 .barra-inicio svg { flex: 0 0 auto; }
 .barra-inicio span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 700; }
 .barra-inicio:focus-visible { outline: 3px solid #ffffff; outline-offset: -3px; }
-.barra-marca a.distintivo { display: inline-flex; flex: 0 0 auto; align-items: center; gap: .3em; min-height: 44px; margin: 0; }
-.barra-marca a.distintivo:focus-visible { outline-color: #ffffff; }
-/* En celulares el distintivo de la barra va en dos líneas para que el nombre entre completo. */
-@media (max-width: 479px) {
-  .barra-marca a.distintivo { flex-direction: column; justify-content: center; gap: 0; padding: 4px 14px; border-radius: 14px; }
+/* Botón de ITSE Fácil en la barra: dos líneas, el servicio arriba y quién lo hace abajo. */
+a.boton-itse {
+  display: flex; flex: 0 0 auto; flex-direction: column; justify-content: center; min-height: 44px; padding: 4px 14px;
+  border-radius: 14px; background: #f4f8fb; color: #4a5b6a; line-height: 1.25; text-align: center; text-decoration: none; white-space: nowrap;
 }
-/* En celulares muy angostos queda solo el símbolo. */
-@media (max-width: 319px) { .barra-inicio span { display: none; } }
+a.boton-itse strong { color: #0b5ea8; font-size: .82rem; }
+a.boton-itse span { font-size: .66rem; }
+a.boton-itse:focus-visible { outline: 3px solid #ffffff; outline-offset: 2px; }
+/* En celulares queda solo el símbolo, para que el botón de ITSE entre completo. */
+@media (max-width: 439px) { .barra-inicio span { display: none; } }
 html { scroll-padding-top: 64px; }
